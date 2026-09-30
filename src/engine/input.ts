@@ -14,6 +14,7 @@ export class Input {
   keys = new Set<string>();
   keysPressed = new Set<string>();
   onFirstGesture: (() => void) | null = null;
+  firstPress = false; // the current press is the page's first gesture (the one that unlocked audio)
 
   constructor(private canvas: HTMLCanvasElement) {
     const toLocal = (e: PointerEvent) => {
@@ -33,6 +34,7 @@ export class Input {
       this.pressX = this.x;
       this.pressY = this.y;
       canvas.setPointerCapture(e.pointerId);
+      this.firstPress = false;
       this.gesture();
     });
     const up = (e: PointerEvent) => {
@@ -58,6 +60,7 @@ export class Input {
     if (this.onFirstGesture) {
       const f = this.onFirstGesture;
       this.onFirstGesture = null;
+      this.firstPress = true;
       f();
     }
   }
