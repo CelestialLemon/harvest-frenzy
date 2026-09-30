@@ -48,8 +48,10 @@ export class TitleScene implements Scene {
     const hasProgress = save.medals.some((m) => m > 0);
     if (ui.button('play', 250, 196, 140, 28, hasProgress ? 'Continue' : 'Play', { color: 'green', font: 'big' })) this.app.go(new MapScene(this.app));
     if (ui.button('shop', 250, 230, 140, 22, 'Upgrades', { color: 'orange', icon: 'icon_star' })) this.app.go(new ShopScene(this.app, new TitleScene(this.app)));
-    const m = save.music > 0, s = save.sfx > 0;
-    if (ui.iconButton('tmusic', 598, 334, m ? 'icon_music' : 'icon_music_off')) { save.music = m ? 0 : 0.5; audio.musicVolume = save.music; persist(); }
+    // Audio is silent until the first gesture, so show music as off until then; if that first press is
+    // on this button, it means "turn music on", not "toggle off what the icon claimed was playing".
+    const m = save.music > 0 && audio.unlocked, s = save.sfx > 0;
+    if (ui.iconButton('tmusic', 598, 334, m ? 'icon_music' : 'icon_music_off')) { save.music = m && !this.app.input.firstPress ? 0 : 0.5; audio.musicVolume = save.music; persist(); }
     if (ui.iconButton('tsound', 574, 334, s ? 'icon_sound' : 'icon_sound_off')) { save.sfx = s ? 0 : 0.8; audio.sfxVolume = save.sfx; persist(); }
     if (hasProgress) {
       if (!this.confirmReset) {

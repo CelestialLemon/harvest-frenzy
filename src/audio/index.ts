@@ -224,6 +224,7 @@ class AudioSystem {
   }
 
   get currentTrack(): MusicTrack | null { return this.want; }
+  get isUnlocked(): boolean { return this.unlocked; }
 
   private applyMusic(): void {
     const want = this.want;
@@ -389,6 +390,8 @@ export const audio = {
   prefetch(track: MusicTrack): void { sys.prefetch(track); },
   /** The most recently requested track. */
   get currentTrack(): MusicTrack | null { return sys.currentTrack; },
+  /** False until the first user gesture: browsers keep audio silent until then. */
+  get unlocked(): boolean { return sys.isUnlocked; },
 };
 
 // Safety net: unlock on the first gesture even if the engine forgets (also recovers iOS interruptions).
