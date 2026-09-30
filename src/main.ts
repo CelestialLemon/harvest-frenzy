@@ -1,6 +1,6 @@
 import './style.css';
 import { audio } from './audio';
-import { createDisplay } from './engine/display';
+import { createDisplay, fillView, view } from './engine/display';
 import { Input } from './engine/input';
 import { draw, preloadAll } from './engine/sprites';
 import { UI } from './engine/ui';
@@ -22,6 +22,7 @@ const app: App = { ctx, input, ui, time: 0, go: (s) => scenes.go(s) };
 (window as unknown as { app: App; scenes: SceneManager }).app = app;
 (window as unknown as { scenes: SceneManager; audio: typeof audio }).scenes = scenes;
 (window as unknown as { audio: typeof audio }).audio = audio;
+(window as unknown as { view: typeof view }).view = view;
 
 preloadAll();
 const params = new URLSearchParams(location.search);
@@ -38,8 +39,8 @@ function loop(now: number) {
   last = now;
   app.time += dt;
   ctx.imageSmoothingEnabled = false;
-  ctx.fillStyle = '#1a1220';
-  ctx.fillRect(0, 0, 640, 360);
+  ctx.setTransform(1, 0, 0, 1, view.ox, view.oy);
+  fillView(ctx, '#1a1220');
   ui.beginFrame();
   scenes.frame(dt, ctx, input);
   if (!touch && input.inside) draw(ctx, 'cursor', input.down ? 1 : 0, input.x, input.y);

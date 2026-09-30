@@ -1,4 +1,5 @@
 // Renders a Game's world (background, buildings, entities, effects). HUD lives in hud.ts.
+import { drawBackdrop } from '../engine/display';
 import { drawText } from '../art/font';
 import { animFrame, draw, drawBC, frameCount, has, sprite } from '../engine/sprites';
 import { ITEMS, type ItemId, type RegionId } from './data';
@@ -39,6 +40,7 @@ const DECOR: Record<RegionId, [string, number, number][]> = {
 
 export class WorldRenderer {
   private bg: HTMLCanvasElement;
+  private ground: HTMLCanvasElement; // plain ground tiles, reflected into the window margins
   private front: HTMLCanvasElement;
   private grassCanvas: HTMLCanvasElement;
   particles: Particle[] = [];
@@ -52,6 +54,8 @@ export class WorldRenderer {
   constructor(private game: Game, warehouseTier: number) {
     this.bg = document.createElement('canvas');
     this.bg.width = 640; this.bg.height = 360;
+    this.ground = document.createElement('canvas');
+    this.ground.width = 640; this.ground.height = 360;
     this.front = document.createElement('canvas');
     this.front.width = 640; this.front.height = 360;
     this.grassCanvas = document.createElement('canvas');
@@ -69,6 +73,7 @@ export class WorldRenderer {
       const h = hash(x * 131 + y * 7);
       draw(c, g, (h % 7 === 0 ? 1 + (h >> 4) % Math.max(1, gn - 1) : 0), x + sprite(g).ox, y + sprite(g).oy);
     }
+    this.ground.getContext('2d')!.drawImage(this.bg, 0, 0);
     for (let y = FIELD.y; y < FIELD.y + FIELD.h; y += 16) for (let x = FIELD.x; x < FIELD.x + FIELD.w; x += 16) {
       const h = hash(x * 17 + y * 911);
       const s = sprite(f);
@@ -187,6 +192,7 @@ export class WorldRenderer {
 
   draw(c: CanvasRenderingContext2D, hover: Hover) {
     const g = this.game;
+    drawBackdrop(c, this.ground);
     c.drawImage(this.bg, 0, 0);
     if (g.grassDirty) this.redrawGrass();
     c.drawImage(this.grassCanvas, FIELD.x - 4, FIELD.y - 4);

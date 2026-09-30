@@ -1,6 +1,7 @@
 // Immediate-mode UI widgets drawn with the pixel UI kit.
 import { audio } from '../audio';
 import { drawText, measureText, lineHeight, wrapText, type FontName, type TextOpts } from '../art/font';
+import { fillView, view } from './display';
 import { draw, drawNine, has } from './sprites';
 import type { Input } from './input';
 
@@ -61,9 +62,8 @@ export class UI {
 
   /** Full-screen dim + block (for modals). */
   modalBackdrop(alpha = 0.55) {
-    this.ctx.fillStyle = `rgba(20,12,24,${alpha})`;
-    this.ctx.fillRect(0, 0, 640, 360);
-    this.block(0, 0, 640, 360);
+    fillView(this.ctx, `rgba(20,12,24,${alpha})`);
+    this.block(-view.ox, -view.oy, view.w, view.h);
   }
 
   /** Returns true when clicked. */

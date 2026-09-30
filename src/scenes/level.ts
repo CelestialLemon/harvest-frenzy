@@ -1,5 +1,6 @@
 // In-level scene: runs the Game simulation, draws the world and all HUD / panels.
 import { audio } from '../audio';
+import { view } from '../engine/display';
 import { animFrame, draw, drawBC, drawNine, drawTL, sprite } from '../engine/sprites';
 import { COLORS, fmtMoney, fmtTime } from '../engine/ui';
 import { ANIMALS, ITEMS, PETS, REGIONS, STATS, WORKSHOPS, WORKSHOP_LEVELS, type AnimalId, type ItemId, type PetId } from '../game/data';
@@ -275,8 +276,9 @@ export class LevelScene implements Scene {
   private drawTopBar(ctx: CanvasRenderingContext2D) {
     const { ui } = this.app;
     const g = this.game;
-    drawNine(ctx, 'ui_panel_dark', 0, -4, -6, 648, 28, [8, 8, 8, 8]);
-    ui.block(0, 0, 640, 20);
+    // bars reach the window edges when the window is wider/taller than the frame
+    drawNine(ctx, 'ui_panel_dark', 0, -view.ox - 4, -view.oy - 6, view.w + 8, view.oy + 28, [8, 8, 8, 8]);
+    ui.block(-view.ox, -view.oy, view.w, view.oy + 20);
     let x = 6;
     ui.text('GOALS', x, 7, { font: 'small', color: '#c7dcd0' });
     x += 26;
@@ -299,8 +301,8 @@ export class LevelScene implements Scene {
   private drawBottomBar(ctx: CanvasRenderingContext2D, dt: number) {
     const { ui, input } = this.app;
     const g = this.game;
-    drawNine(ctx, 'ui_panel_dark', 0, -4, 318, 648, 46, [8, 8, 8, 8]);
-    ui.block(0, 320, 640, 40);
+    drawNine(ctx, 'ui_panel_dark', 0, -view.ox - 4, 318, view.w + 8, view.h - view.oy - 318 + 4, [8, 8, 8, 8]);
+    ui.block(-view.ox, 320, view.w, view.h - view.oy - 320);
     let x = 5;
     const buy = (id: string, spriteName: string, cost: number, label: string, tip: string[], onClick: () => void, disabled = false) => {
       const afford = g.money >= cost && !disabled;

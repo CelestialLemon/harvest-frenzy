@@ -1,4 +1,5 @@
 // Scene manager with fade transitions.
+import { fillView } from '../engine/display';
 import type { Input } from '../engine/input';
 import type { UI } from '../engine/ui';
 
@@ -55,8 +56,7 @@ export class SceneManager {
     if (this.transitioning) input.consumed = true; // no clicks during fades
     this.current?.frame(dt, ctx);
     if (this.fade > 0) {
-      ctx.fillStyle = `rgba(20,12,24,${this.fade})`;
-      ctx.fillRect(0, 0, 640, 360);
+      fillView(ctx, `rgba(20,12,24,${this.fade})`);
     }
   }
 }

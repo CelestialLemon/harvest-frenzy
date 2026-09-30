@@ -713,9 +713,6 @@ function drawMap(p: PixelCanvas) {
 
   // --- the dirt path ---
   drawPath(p);
-  // frame
-  for (let x = 0; x < W; x++) { p.set(x, 0, '0'); p.set(x, H - 1, '0'); }
-  for (let y = 0; y < H; y++) { p.set(0, y, '0'); p.set(W - 1, y, '0'); }
 }
 
 function dots(p: PixelCanvas, c: Col, pts: [number, number][]) { for (const [x, y] of pts) p.set(x, y, c); }

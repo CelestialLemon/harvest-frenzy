@@ -1,6 +1,7 @@
 // Title, world map and upgrade shop scenes.
 import { audio } from '../audio';
 import { MAP_NODES } from '../art/scenes';
+import { drawBackdrop, fillView } from '../engine/display';
 import { animFrame, draw, drawBC, drawTL, sprite } from '../engine/sprites';
 import { COLORS, fmtTime } from '../engine/ui';
 import { REGIONS, UPGRADES, type UpgradeId } from '../game/data';
@@ -34,7 +35,7 @@ export class TitleScene implements Scene {
   frame(dt: number, ctx: CanvasRenderingContext2D) {
     const { ui } = this.app;
     this.t += dt;
-    drawTL(ctx, 'title_bg', 0, 0, 0);
+    drawBackdrop(ctx, sprite('title_bg').frames[0]);
     // drifting clouds are part of the bg; add a few hopping chickens for life
     for (let i = 0; i < 3; i++) {
       const x = ((this.t * (10 + i * 4) + i * 230) % 760) - 60;
@@ -77,7 +78,7 @@ export class MapScene implements Scene {
   frame(dt: number, ctx: CanvasRenderingContext2D) {
     const { ui, input } = this.app;
     this.t += dt;
-    drawTL(ctx, 'map_bg', 0, 0, 0);
+    drawBackdrop(ctx, sprite('map_bg').frames[0]);
     const unlocked = unlockedUpTo();
     // path dots between nodes
     for (let i = 0; i + 1 < MAP_NODES.length; i++) {
@@ -171,9 +172,8 @@ export class ShopScene implements Scene {
   frame(dt: number, ctx: CanvasRenderingContext2D) {
     const { ui } = this.app;
     this.t += dt;
-    drawTL(ctx, 'title_bg', 0, 0, 0);
-    ctx.fillStyle = 'rgba(20,12,24,0.35)';
-    ctx.fillRect(0, 0, 640, 360);
+    drawBackdrop(ctx, sprite('title_bg').frames[0]);
+    fillView(ctx, 'rgba(20,12,24,0.35)');
     ui.panel(40, 14, 560, 332);
     ui.text('Upgrade Shop', 320, 24, { font: 'big', color: '#f9c22b', outline: '#2e222f', align: 'center' });
     ui.text('Spend stars earned from medals on permanent farm upgrades.', 320, 40, { font: 'small', color: '#625565', align: 'center' });
