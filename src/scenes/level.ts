@@ -112,6 +112,7 @@ export class LevelScene implements Scene {
     // HUD
     this.drawTopBar(ctx);
     this.drawBottomBar(ctx, dt);
+    this.world.drawOverlay(ctx);
     this.drawToasts(ctx, dt);
     if (this.level.tutorial && this.panel === null) this.drawTutorial(ctx, dt);
     if (this.panel === null) this.drawHoverTooltip(ctx);
@@ -186,12 +187,14 @@ export class LevelScene implements Scene {
     else ui.progress(wx + 10, wy, 36, 3, g.water / g.wellCap, g.water === 0 ? '#e83b3b' : '#4d9be6');
     draw(ctx, 'icon_water', 0, wx + 4, wy + 1);
     if (g.water === 0 && g.wellRefillT <= 0 && Math.floor(t * 3) % 2 === 0) {
-      ui.text('REFILL!', WELL.x + 28, WELL.y - 2, { font: 'small', color: '#fbff86', outline: '#2e222f', align: 'center' });
+      ui.text('REFILL!', WELL.x + 28, WELL.y + 4, { font: 'small', color: '#fbff86', outline: '#2e222f', align: 'center' });
     }
 
     // warehouse capacity
     const used = g.storeUsed, cap = g.storeCap;
-    const bx = WAREHOUSE.x + 22, by = WAREHOUSE.y + WAREHOUSE.h + 2;
+    const bx = WAREHOUSE.x + 22, by = this.world.warehouseTop() - 12;
+    ctx.fillStyle = 'rgba(46,34,47,0.75)';
+    ctx.fillRect(bx - 3, by - 2, 74, 14);
     ui.progress(bx, by, 68, 4, used / cap, used >= cap ? '#e83b3b' : used / cap > 0.75 ? '#f79617' : '#1ebc73');
     ui.text(`${used}/${cap}`, bx + 34, by + 6, { font: 'small', color: '#ffffff', outline: '#2e222f', align: 'center' });
 
@@ -247,16 +250,15 @@ export class LevelScene implements Scene {
     if (g.truck.state !== 'home') {
       const total = g.truck.trip;
       const elapsed = (g.truck.state === 'out' ? 0 : total / 2) + g.truck.t;
-      ui.progress(TRUCK_HOME.x + 8, TRUCK_HOME.y + 16, 40, 3, elapsed / total, '#f9c22b');
-      draw(ctx, 'icon_truck', 0, TRUCK_HOME.x + 2, TRUCK_HOME.y + 17);
+      if (this.world.truckAway()) this.drawTrip(ctx, TRUCK_HOME.x - 2, TRUCK_HOME.y + 12, elapsed / total, 'icon_truck', '#f9c22b');
     } else if (g.storeUsed / g.storeCap >= 0.75 && Math.floor(t * 2) % 2 === 0) {
       drawBC(ctx, 'arrow_hint', animFrame('arrow_hint', t, 4), TRUCK_HOME.x + 28, TRUCK_HOME.y + 2);
     }
     // heli timer
-    if (g.heli.state !== 'home') {
+    if (g.heli.state !== 'home' && this.world.heliAway()) {
       const total = g.heli.trip;
       const elapsed = (g.heli.state === 'out' ? 0 : total / 2) + g.heli.t;
-      ui.progress(HELIPAD.x + 8, HELIPAD.y + HELIPAD.h + 2, 40, 3, elapsed / total, '#4d9be6');
+      this.drawTrip(ctx, HELIPAD.x + 2, HELIPAD.y + 6, elapsed / total, 'icon_heli', '#4d9be6');
     }
     // cage timers
     for (const p of g.predators) {
@@ -270,6 +272,23 @@ export class LevelScene implements Scene {
         }
       }
     }
+  }
+
+  /** Trip progress: farm on the right, town on the left; the vehicle icon travels out and back. */
+  private drawTrip(ctx: CanvasRenderingContext2D, x: number, y: number, k: number, icon: string, color: string) {
+    const w = 60;
+    ctx.fillStyle = 'rgba(46,34,47,0.8)';
+    ctx.fillRect(x, y, w, 11);
+    ctx.fillRect(x + 1, y - 1, w - 2, 13);
+    ctx.fillStyle = '#625565';
+    ctx.fillRect(x + 6, y + 5, w - 12, 1);
+    for (let i = x + 8; i < x + w - 6; i += 4) { ctx.fillStyle = '#9babb2'; ctx.fillRect(i, y + 5, 2, 1); }
+    ctx.fillStyle = color;
+    ctx.fillRect(x + 3, y + 3, 2, 5); // town
+    ctx.fillRect(x + w - 5, y + 3, 2, 5); // farm
+    const out = k < 0.5, p = out ? k * 2 : (1 - k) * 2; // 0 at the farm, 1 in town
+    const ix = x + w - 8 - Math.round(p * (w - 16));
+    draw(ctx, icon, 0, ix, y + 5 + (Math.floor(this.world.time * 8) % 2), { flip: !out });
   }
 
   // ---------------------------------------------------------------- HUD bars
@@ -334,6 +353,8 @@ export class LevelScene implements Scene {
       if (diff > 0) this.moneyPulse = 1;
       this.shownMoney += Math.sign(diff) * Math.max(1, Math.abs(diff) * Math.min(1, dt * 8));
     } else this.shownMoney = g.money;
+    this.world.coinTarget = [mx + 6, 339];
+    if (this.world.coinHits > 0) { this.world.coinHits = 0; this.moneyPulse = 1; audio.sfx('coin', { vol: 0.35, rate: 1 + Math.random() * 0.3 }); }
     this.moneyPulse = Math.max(0, this.moneyPulse - dt * 3);
     draw(ctx, 'icon_coin', 0, mx + 6, 339 - Math.round(this.moneyPulse * 2));
     ui.text(fmtMoney(Math.round(this.shownMoney)), mx + 15, 333, { font: 'big', color: this.moneyPulse > 0.5 ? '#fbff86' : '#f9c22b', outline: '#2e222f' });
@@ -460,7 +481,7 @@ export class LevelScene implements Scene {
     type Step = { text: string; at: () => [number, number] | null; done: () => boolean };
     const firstEgg = () => g.items.find((i) => i.item === 'egg');
     const steps: Step[] = [
-      { text: 'Click empty ground in the field to plant grass. Chickens love it!', at: () => [FIELD.x + 250, FIELD.y + 150], done: () => g.water < g.wellCap },
+      { text: 'Click empty ground in the field to plant grass. Chickens love it!', at: () => [FIELD.x + 210, FIELD.y + 80], done: () => g.water < g.wellCap },
       { text: 'Your chicken eats grass and lays eggs. Click an egg to collect it!', at: () => { const e = firstEgg(); return e ? [e.x, e.y - 12] : null; }, done: () => (g.collected.egg ?? 0) > 0 },
       { text: 'Buy another chicken with the button below.', at: () => [28, 322], done: () => g.animals.length >= 2 },
       { text: 'Keep the grass growing and collect 6 eggs. When the well runs dry, click it to refill!', at: () => (g.water <= 1 ? [WELL.x + 28, WELL.y + 4] : null), done: () => g.won },

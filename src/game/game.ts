@@ -16,6 +16,8 @@ export type GameEvent =
   | { type: 'fx'; fx: FxKind; x: number; y: number }
   | { type: 'fly'; item: ItemId; x: number; y: number }
   | { type: 'ghost'; x: number; y: number }
+  | { type: 'squash'; id: number; amount: number } // purely visual squash-and-stretch on an entity
+  | { type: 'plant'; x: number; y: number }
   | { type: 'shake'; amount: number }
   | { type: 'toast'; text: string }
   | { type: 'goal'; index: number }
@@ -55,7 +57,7 @@ export interface GoalState { goal: Goal; progress: number; done: boolean }
 export type HoverKind = 'item' | 'predator' | 'cage' | 'well' | 'slot' | 'warehouse' | 'truck' | 'heli' | 'field' | 'none';
 export interface Hover { kind: HoverKind; id?: number; slot?: SlotId }
 
-const WALK = { x0: FIELD.x + 10, x1: FIELD.x + FIELD.w - 10, y0: FIELD.y + 14, y1: FIELD.y + FIELD.h - 4 };
+const WALK = { x0: FIELD.x + 10, x1: FIELD.x + FIELD.w - 10, y0: FIELD.y + 14, y1: FIELD.y + FIELD.h - 8 };
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
 const dist = (ax: number, ay: number, bx: number, by: number) => Math.hypot(ax - bx, ay - by);
 
@@ -196,6 +198,7 @@ export class Game {
     this.plantAt(x, y);
     this.sfx('plant', 0.8, rand(0.9, 1.1));
     this.emit({ type: 'fx', fx: 'splash', x, y });
+    this.emit({ type: 'plant', x, y });
     return true;
   }
 
@@ -278,6 +281,7 @@ export class Game {
       if (a.fallH <= 0) {
         a.fallH = 0; a.state = 'idle'; a.timer = 0.6;
         this.emit({ type: 'fx', fx: 'dust', x: a.x, y: a.y });
+        this.emit({ type: 'squash', id: a.id, amount: 1 });
         this.sfx(a.kind, 0.7);
       }
       return;
@@ -290,6 +294,7 @@ export class Game {
       if (a.prod >= 1) {
         a.prod = 0;
         this.dropItem(def.product, a.x + a.dir * 3, a.y + 1);
+        this.emit({ type: 'squash', id: a.id, amount: 0.8 });
         this.stats.produced++;
         if (Math.random() < 0.5) this.sfx(a.kind, 0.45, rand(0.9, 1.15));
       }
@@ -410,6 +415,7 @@ export class Game {
   hitPredator(p: Predator) {
     p.hits++;
     p.flash = 0.15;
+    this.emit({ type: 'squash', id: p.id, amount: 0.7 });
     p.stun = 0.35;
     this.emit({ type: 'fx', fx: 'hit', x: p.x + rand(-6, 6), y: p.y - 14 + rand(-5, 5) });
     this.sfx('hit', 0.9, 0.9 + p.hits * 0.08);
@@ -449,6 +455,7 @@ export class Game {
         if (p.fallH <= 0) {
           p.fallH = 0; p.state = 'land'; p.t = 0.9;
           this.emit({ type: 'fx', fx: 'dust', x: p.x, y: p.y });
+          this.emit({ type: 'squash', id: p.id, amount: 1.4 });
           this.emit({ type: 'shake', amount: 4 });
           this.sfx('predator_land');
           this.sfx(def.roar, 0.9);
@@ -544,6 +551,7 @@ export class Game {
       if (pet.fallH <= 0) {
         pet.fallH = 0; pet.state = 'idle'; pet.t = 0.5;
         this.emit({ type: 'fx', fx: 'dust', x: pet.x, y: pet.y });
+        this.emit({ type: 'squash', id: pet.id, amount: 1 });
         this.sfx(pet.kind === 'cat' ? 'meow' : 'bark', 0.7);
       }
       return;
@@ -725,7 +733,7 @@ export class Game {
       const half = tr.trip / 2;
       if (tr.state === 'out' && tr.t >= half) {
         tr.state = 'back'; tr.t = 0;
-        this.earn(tr.value, 60, 300);
+        this.earn(tr.value, TRUCK_HOME.x + 28, TRUCK_HOME.y - 4);
         this.sfx('cash');
         tr.cargo = {};
       } else if (tr.state === 'back' && tr.t >= half) {
@@ -747,7 +755,7 @@ export class Game {
               this.addToStore(id, 1, false);
               this.emit({ type: 'fly', item: id, x: HELI_LAND.x + rand(-10, 10), y: HELI_LAND.y - 6 });
             } else {
-              this.dropItem(id, HELIPAD.x + 28, HELIPAD.y + 44, 12);
+              this.dropItem(id, HELIPAD.x - 16, HELI_LAND.y, 10);
             }
           }
         }
@@ -796,7 +804,7 @@ export class Game {
     for (const w of this.workshops) if (inRect(x, y, SLOTS[w.slot])) return { kind: 'slot', slot: w.slot };
     if (inRect(x, y, WAREHOUSE)) return { kind: 'warehouse' };
     if (this.truck.state === 'home' && inRect(x, y, { x: TRUCK_HOME.x, y: TRUCK_HOME.y, w: 56, h: 32 })) return { kind: 'truck' };
-    if (inRect(x, y, { x: HELIPAD.x, y: HELIPAD.y - 26, w: HELIPAD.w, h: HELIPAD.h + 26 })) return { kind: 'heli' };
+    if (inRect(x, y, { x: HELIPAD.x, y: HELIPAD.y - 20, w: HELIPAD.w, h: HELIPAD.h + 20 })) return { kind: 'heli' };
     if (inField(x, y, 4)) return { kind: 'field' };
     return { kind: 'none' };
   }

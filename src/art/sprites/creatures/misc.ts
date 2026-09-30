@@ -1,5 +1,5 @@
 import { PixelCanvas, type SpriteDef } from '../../pixel';
-import { anim, g, selOutline } from './util';
+import { anim, g, selOutline, charAt } from './util';
 
 // ---------------------------------------------------------------------------------------------
 // Ghost 12x14: little angel spirit (halo, tiny wings, happy closed eyes). f0/f1 = wing flap + wavy tail.
@@ -80,76 +80,185 @@ function parachute(p: PixelCanvas) {
 
 // ---------------------------------------------------------------------------------------------
 // Grass 10x12, anchor (5,11). frames: stage1a, stage1b, stage2a, stage2b, stage3a, stage3b.
-type Blade = [number, number, number]; // base x, height, lean
-function blade(c: PixelCanvas, [x, h, lean]: Blade, front: boolean) {
-  for (let i = 0; i < h; i++) {
-    const t = i / Math.max(1, h - 1); // 0 base .. 1 tip
-    const xx = Math.round(x + lean * t * t);
-    const y = 11 - i;
-    let col: string;
-    if (i === h - 1) col = front ? 'H' : 'h';
-    else if (t > 0.6) col = front ? 'h' : 'G';
-    else if (t > 0.25) col = front ? 'G' : 'F';
-    else col = front ? 'F' : 'f';
-    c.set(xx, y, col);
-  }
-}
-
-function sprout(c: PixelCanvas, x: number, h: number, flip: boolean, sway: number) {
-  // tiny seedling: stem + two leaves; sway shifts the leaves 1px
-  for (let i = 0; i < h; i++) c.set(x, 11 - i, i === 0 ? 'F' : 'G');
-  const ty = 11 - h, sx = x + sway;
-  c.set(sx - 1, ty + 1 - (sway && flip ? 0 : 0), flip ? 'h' : 'G'); c.set(sx + 1, ty + 1, flip ? 'G' : 'h');
-  c.set(sx - 1, ty, flip ? 'H' : 'h'); c.set(sx + 2, ty + (flip ? 0 : 1), 'H');
-  c.set(sx, ty, 'H');
-  c.set(x, 11, 'f');
-}
-
-function young(c: PixelCanvas, sway: number) {
-  c.ellipse(5, 11.5, 3.2, 1.2, 'F');
-  for (const [x, h, l] of [[2, 4, -1], [4, 6, -1], [6, 5, 1], [8, 3, 1]] as Blade[]) blade(c, [x, h, l + sway], false);
-  for (const [x, h, l] of [[3, 5, 0], [5, 6, 1], [7, 4, 1]] as Blade[]) blade(c, [x, h, l + sway], true);
-  c.hline(3, 7, 11, 'f');
-}
-
-function lush(c: PixelCanvas, sway: number) {
-  // clump body: fills the whole cell so dense planting merges into one meadow
+// a/b are different blade layouts (not just sway) so neighbouring cells can mix them for an organic patch.
+// Chunky clumps: a solid mid-green mass (so stacked rows merge) with thick tapering blades rising from it.
+// Blade = [x, topY, lean]; 2px wide (lit left / shadow right) in the lower part, 1px above, brightest last 2px.
+type Blade = [number, number, number];
+interface Clump { cx: number; cy: number; rx: number; ry: number; blades: Blade[]; }
+function clump(c: PixelCanvas, k: Clump) {
   const m = new PixelCanvas(10, 12);
-  m.ellipse(5, 8.2, 5, 4, 'F');
-  m.rect(0, 9, 10, 3, 'F');
-  m.set(0, 11, null); m.set(9, 11, null);
-  c.blit(m, 0, 0);
-  // inner texture: short light blade strokes with dark gaps under them
-  const strokes: [number, number, number][] = [[1, 8, 3], [3, 6, 3], [5, 7, 4], [7, 6, 3], [8, 9, 2], [2, 10, 2], [6, 10, 2], [4, 9, 2]];
-  for (const [x, y, l] of strokes) for (let i = 0; i < l; i++) {
-    const yy = y - i;
-    if (!m.opaque(x, yy)) continue;
-    c.set(x + (i === l - 1 && l >= 3 ? sway : 0), yy, i === l - 1 ? 'h' : 'G');
-  }
-  for (const [x, y] of strokes) if (m.opaque(x, y + 1)) c.set(x, y + 1, 'f');
-  // blades poking above the clump (these sway)
-  const tips: Blade[] = [[1, 8, -1], [3, 11, -1], [5, 12, 1], [6, 10, 1], [8, 8, 1], [2, 9, 0]];
-  for (const [x, h, lean0] of tips) {
-    const lean = lean0 + sway;
-    for (let i = 5; i < h; i++) {
-      const t = i / (h - 1);
+  m.ellipse(k.cx, k.cy, k.rx, k.ry, 'G');
+  const bodyTop = Math.round(k.cy - k.ry);
+  // blades (short first)
+  for (const [x, top, lean] of [...k.blades].sort((p, q) => q[1] - p[1])) {
+    const h = 11 - top;
+    const startY = Math.min(11, bodyTop + 3);
+    for (let y = startY; y >= top; y--) {
+      const t = (startY - y) / Math.max(1, startY - top); // 0 base .. 1 tip
       const xx = Math.round(x + lean * t * t);
-      c.set(xx, 11 - i, i === h - 1 ? 'H' : t > 0.75 ? 'h' : 'G');
+      const fromTip = y - top;
+      const wide = t < 0.5 && h >= 5;
+      if (fromTip === 0) m.set(xx, y, 'H');
+      else if (fromTip === 1) m.set(xx, y, 'h');
+      else {
+        m.set(xx, y, t < 0.3 ? 'G' : 'h');
+        if (wide) m.set(xx + 1, y, t < 0.3 ? 'F' : 'G');
+      }
     }
   }
-  for (let x = 1; x <= 8; x++) c.set(x, 11, x % 3 === 0 ? 'f' : 'F');
+  // shading: shadow side (right / bottom-right), sparse deep shade, top-left light
+  for (let y = 0; y < 12; y++) for (let x = 0; x < 10; x++) {
+    if (!m.opaque(x, y)) continue;
+    const below = m.opaque(x, y + 1), right = m.opaque(x + 1, y);
+    const col = charAt(m, x, y);
+    if (col !== 'G') continue;
+    if (!right || (!below && x % 2 === 0)) m.set(x, y, 'F');
+    else if (!m.opaque(x - 1, y) && y > bodyTop + 1) m.set(x, y, 'h');
+    else if (!m.opaque(x, y - 1) && !m.opaque(x - 1, y - 1)) m.set(x, y, 'h');
+  }
+  // deep shade just under a couple of blade roots (not a band)
+  for (const [x] of k.blades) if (m.opaque(x, bodyTop + 4) && x % 2) m.set(x, bodyTop + 4, 'F');
+  c.blit(m, 0, 0);
+}
+function sproutClump(c: PixelCanvas, xs: [number, number][], alt: boolean) {
+  // stage 1: tiny mass + short thick blades
+  c.ellipse(5, 10.5, alt ? 3 : 2.6, 1.6, 'G');
+  c.hline(alt ? 3 : 3, alt ? 7 : 6, 11, 'F');
+  for (const [x, top] of xs) {
+    for (let y = 10; y >= top; y--) {
+      const fromTip = y - top;
+      c.set(x, y, fromTip === 0 ? 'H' : fromTip === 1 ? 'h' : 'G');
+      if (fromTip >= 2) c.set(x + 1, y, 'F');
+    }
+  }
 }
 
-// frames: [stage1a, stage1b, stage2a, stage2b, stage3a, stage3b]; b = same tuft swayed 1px (usable as a
-// 2-frame wind loop or as a variant).
 const GRASS: ((c: PixelCanvas) => void)[] = [
-  (c) => { sprout(c, 3, 2, false, 0); sprout(c, 6, 3, true, 0); },
-  (c) => { sprout(c, 3, 2, false, 1); sprout(c, 6, 3, true, 1); },
-  (c) => young(c, 0),
-  (c) => young(c, 1),
-  (c) => lush(c, 0),
-  (c) => lush(c, 1),
+  (c) => sproutClump(c, [[3, 6], [5, 5], [7, 7]], false),
+  (c) => sproutClump(c, [[2, 7], [4, 6], [6, 5]], true),
+  (c) => clump(c, { cx: 4.8, cy: 9, rx: 4.4, ry: 3, blades: [[1, 5, -1], [3, 4, 0], [5, 3, 1], [7, 5, 1]] }),
+  (c) => clump(c, { cx: 5.2, cy: 9, rx: 4.4, ry: 3, blades: [[2, 4, -1], [4, 5, 0], [6, 3, 0], [8, 5, 1]] }),
+  (c) => clump(c, { cx: 4.9, cy: 8.2, rx: 4.9, ry: 3.9, blades: [[0, 4, -1], [2, 0, -1], [4, 1, 0], [6, 0, 1], [8, 2, 1], [3, 3, 0]] }),
+  (c) => clump(c, { cx: 5.1, cy: 8.2, rx: 4.9, ry: 3.9, blades: [[1, 2, -1], [3, 1, -1], [5, 0, 0], [7, 1, 1], [8, 3, 1], [0, 5, 0]] }),
 ];
+
+// grass_base 12x10, anchor (6,9): soft darker-green ground blob under every planted cell (stage 1..3).
+function grassBase(p: PixelCanvas, f: number) {
+  const q = new PixelCanvas(12, 10);
+  const bl: [number, number, number, number][][] = [
+    [[6, 6.5, 2.6, 1.8]],
+    [[6, 5.5, 4.6, 3], [3.5, 6.5, 2.5, 2], [8.5, 6, 2.5, 2]],
+    [[6, 5, 5.6, 3.9], [2.6, 6, 2.8, 2.6], [9.4, 6, 2.8, 2.6], [4.5, 2.6, 2.6, 2], [8, 2.4, 2.6, 2]],
+  ];
+  for (const [cx, cy, rx, ry] of bl[f]) q.ellipse(cx, cy, rx, ry, 'F');
+  const src = q.clone();
+  for (let y = 0; y < 10; y++) for (let x = 0; x < 12; x++) {
+    if (!src.opaque(x, y)) continue;
+    if (!src.opaque(x, y + 1) && (x + f) % 3 !== 0) q.set(x, y, 'f'); // darker rim at bottom
+    else if (!src.opaque(x, y - 1) && !src.opaque(x - 1, y) && f) q.set(x, y, 'G');
+    else if ((x * 5 + y * 7 + f) % 9 === 0) q.set(x, y, 'G');
+  }
+  p.blit(q, 0, 0);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Ambient life + new FX
+function smoke(p: PixelCanvas, f: number) {
+  const R = [1.6, 2.6, 3.6, 4.4, 4.9, 5.2][f];
+  const cy = [9.5, 8.5, 7.3, 6.3, 5.4, 4.6][f];
+  const cx = 6 + [0, -0.5, 0.5, 0, -0.5, 0][f];
+  const dens = [1, 1, 1, 0.66, 0.4, 0.2][f];
+  const bayer = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
+  const blobs: [number, number, number][] = [[cx, cy, R]];
+  if (f >= 1) blobs.push([cx - R * 0.55, cy + R * 0.35, R * 0.6], [cx + R * 0.6, cy + R * 0.2, R * 0.55]);
+  for (let y = 0; y < 12; y++) for (let x = 0; x < 12; x++) {
+    let inside = false, lit = 0;
+    for (const [bx, by, br] of blobs) {
+      const d = Math.hypot(x + 0.5 - bx, y + 0.5 - by);
+      if (d <= br) { inside = true; lit = Math.max(lit, 1 - d / br); }
+    }
+    if (!inside) continue;
+    if (bayer[y & 3][x & 3] / 16 >= dens) continue;
+    const shade = (x + 0.5 - cx) * 0.5 + (y + 0.5 - cy) * 0.6; // lower-right darker
+    p.set(x, y, shade > R * 0.45 ? '7' : shade > -R * 0.05 ? '8' : '9');
+  }
+}
+
+function coin(p: PixelCanvas, f: number) {
+  const rx = [3.5, 2.6, 1.5, 0.5, 1.5, 2.6][f];
+  const c = new PixelCanvas(9, 9);
+  c.ellipse(4.5, 4.5, rx, 3.5, 'Y');
+  // lower-right rim and edge thickness
+  for (let y = 0; y < 9; y++) for (let x = 0; x < 9; x++) {
+    if (!c.opaque(x, y)) continue;
+    if (!c.opaque(x + 1, y) || !c.opaque(x, y + 1)) c.set(x, y, 'y');
+  }
+  if (rx > 2) {
+    c.vline(4, 3, 5, 'y'); // embossed slot
+    c.set(3, 2, 'z'); c.set(2, 3, 'z');
+  } else if (rx > 1) {
+    c.vline(4, 3, 5, 'y');
+    c.set(3, 3, 'z');
+  } else if (rx < 1) {
+    c.vline(4, 2, 6, 'y'); c.set(4, 2, 'z');
+  }
+  selOutline(c, { Y: 'd', y: 'd', z: 'd' }, 'd');
+  p.blit(c, 0, 0);
+}
+
+function star(p: PixelCanvas, f: number) {
+  const arm = [1, 3, 2][f];
+  p.set(3, 3, '9');
+  for (let i = 1; i <= arm; i++) {
+    const col = i === arm && arm > 1 ? 'Y' : i === 1 ? '9' : 'z';
+    p.set(3 - i, 3, col); p.set(3 + i, 3, col); p.set(3, 3 - i, col); p.set(3, 3 + i, col);
+  }
+  if (arm === 3) { p.set(2, 2, 'z'); p.set(4, 4, 'Y'); }
+}
+
+// 7x6 white/yellow butterfly; 0 = body, 7 = pale wing edge (keeps it visible on snow), Y/y = yellow spots
+const BFLY: string[][] = [
+  ['.2...2.', '7992997', '9Y929Y9', '.79297.', '..y2y..', '...2...'],
+  ['.2...2.', '.79297.', '.9Y2Y9.', '..y2y..', '...2...', '.......'],
+  ['..2.2..', '..79...', '..9Y2..', '..y92..', '...2...', '.......'],
+  ['.2...2.', '.79297.', '.9Y2Y9.', '..y2y..', '...2...', '.......'],
+];
+function butterfly(p: PixelCanvas, f: number) {
+  p.grid(0, 0, BFLY[f]);
+}
+
+// side view facing right; 1 = night body, 2 = slate wing, 6 = light wing tip, Y = beak, 9 = eye glint
+const BIRD: string[][] = [
+  ['....6....', '...62....', '...22.11.', '11.22111Y', '.1111111.', '...11....', '.........'], // wings up
+  ['.........', '..62..11.', '.62211111', '11221111Y'.slice(0, 8) + 'Y', '.1111111.', '...11....', '.........'], // half up
+  ['.........', '.........', '.....11..', '66221111Y', '.1111111.', '...11....', '.........'], // level
+  ['.........', '.........', '.....11..', '11111111Y', '.2211111.', '.6221....', '.66......'], // down
+];
+function bird(p: PixelCanvas, f: number) {
+  p.grid(0, 0, BIRD[f]);
+}
+
+function leaf(p: PixelCanvas, f: number) {
+  if (f === 0) {
+    p.grid(0, 0, ['.hH.', 'hGy.', '.yG.', '..y.']);
+  } else {
+    p.grid(0, 0, ['..y.', '.GyH', 'hGh.', '.H..']);
+  }
+}
+
+function ring(p: PixelCanvas, f: number) {
+  const rx = [4, 7, 10, 11.5][f], ry = [2, 3.5, 5, 5.5][f];
+  const q = new PixelCanvas(24, 12);
+  q.ring(12, 6, rx, ry, '9');
+  if (f === 0) q.ring(12, 6, rx - 1.5, ry - 0.75, '8');
+  const keep = [1, 1, 0.66, 0.33][f];
+  const bayer = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
+  for (let y = 0; y < 12; y++) for (let x = 0; x < 24; x++) {
+    if (!q.opaque(x, y)) continue;
+    if (bayer[y & 3][x & 3] / 16 >= keep) continue;
+    p.set(x, y, f === 3 ? '8' : '9');
+  }
+}
 
 // ---------------------------------------------------------------------------------------------
 // FX
@@ -283,6 +392,14 @@ export const miscSprites: Record<string, SpriteDef> = {
   ghost: anim(12, 14, 2, ghost, { fps: 4 }),
   parachute: anim(24, 18, 1, parachute, { fps: 1 }),
   grass: anim(10, 12, 6, (p, f) => GRASS[f](p), { ox: 5, oy: 11, fps: 2 }),
+  grass_base: anim(12, 10, 3, grassBase, { ox: 6, oy: 9, fps: 1 }),
+  fx_smoke: anim(12, 12, 6, smoke, { ox: 6, oy: 6, fps: 6 }),
+  fx_coin: anim(9, 9, 6, coin, { ox: 4, oy: 4, fps: 12 }),
+  fx_star: anim(7, 7, 3, star, { ox: 3, oy: 3, fps: 8 }),
+  butterfly: anim(7, 6, 4, butterfly, { ox: 3, oy: 3, fps: 8 }),
+  bird: anim(9, 7, 4, bird, { ox: 4, oy: 3, fps: 8 }),
+  leaf: anim(4, 4, 2, leaf, { ox: 2, oy: 2, fps: 3 }),
+  fx_ring: anim(24, 12, 4, ring, { ox: 12, oy: 6, fps: 10 }),
   fx_puff: anim(16, 16, 5, puff, { ox: 8, oy: 8, fps: 12 }),
   fx_dust: anim(24, 10, 4, dust, { fps: 10 }),
   fx_sparkle: anim(9, 9, 4, sparkle, { ox: 4, oy: 4, fps: 10 }),
