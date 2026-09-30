@@ -80,20 +80,20 @@ export function puff(p: PixelCanvas, x: number, y: number) {
   p.set(x, y, '8'); p.set(x - 1, y - 1, '9'); p.set(x + 1, y, '8');
 }
 
-/** Grass tuft: blades fanning out from base. */
+/** Grass tuft: pointed blades fanning out from base, dark base, bright tips. */
 export function tuft(p: PixelCanvas, x: number, y: number, h: number, r: Rnd, cols = ['f', 'F', 'G', 'h'], n = 5) {
   for (let i = 0; i < n; i++) {
-    const lean = (i - (n - 1) / 2) * 0.45 + (r() - 0.5) * 0.3;
-    const bh = h * (0.65 + r() * 0.5);
-    let px = x + (i - (n - 1) / 2) * 0.9;
+    const k = (i - (n - 1) / 2) / ((n - 1) / 2 || 1);
+    const bh = h * (1 - Math.abs(k) * 0.35) * (0.8 + r() * 0.4);
+    const lean = k * 0.9;
     for (let s = 0; s < bh; s++) {
       const t = s / bh;
-      const xx = Math.round(px + lean * s * (1 + t * 0.6) * 0.6);
-      const c = t < 0.34 ? cols[1] : t < 0.75 ? cols[2] : cols[3];
-      p.set(xx, Math.round(y - s), lean < -0.2 && t > 0.5 ? cols[3] : c);
-      if (s === 0) p.set(xx, y + 1, cols[0]);
+      const xx = Math.round(x + k * 1.2 + lean * s * 0.75);
+      const c = t < 0.3 ? cols[1] : t < 0.7 ? cols[2] : cols[3];
+      p.set(xx, Math.round(y - s), k > 0.3 && t < 0.7 ? cols[1] : c);
     }
   }
+  p.set(x, y, cols[0]); p.set(x + 1, y, cols[0]);
 }
 
 /** Dark-outline circle pixel helper. */
@@ -144,12 +144,48 @@ export function bez(x0: number, y0: number, x1: number, y1: number, x2: number, 
 // ground geometry shared with the other fore_* files
 export const topL = (x: number) => 284 + 16 * Math.pow(Math.min(1, x / 258), 2.2);
 export const topR = (x: number) => 284 + 16 * Math.pow(Math.min(1, (640 - x) / 262), 2.2);
-export const bankL = (y: number) => 262 - (y - 300) * 0.5;
-export const bankR = (y: number) => 378 + (y - 300) * 0.75;
+const BLIN = (y: number) => 262 - (y - 300) * 0.5;
+const BRIN = (y: number) => 378 + (y - 300) * 0.75;
+const BL: number[] = [], BR: number[] = [];
+const interp = (a: number[], f: (y: number) => number, y: number) => {
+  const i = Math.floor(y), t = y - i;
+  const v0 = a[i] ?? f(i), v1 = a[i + 1] ?? f(i + 1);
+  return v0 + (v1 - v0) * t;
+};
+export const bankL = (y: number) => interp(BL, BLIN, y);
+export const bankR = (y: number) => interp(BR, BRIN, y);
+/** Read the river's real extents out of the already-painted mid layer so the bank hugs its water. */
+export function initBanks(p: PixelCanvas) {
+  const water = (x: number, y: number) => {
+    const v = p.get(x, y); const r = v & 255, g = (v >>> 8) & 255, b = (v >>> 16) & 255;
+    return b > 100 && b > r + 30 && g - b < 55;
+  };
+  const rawL: number[] = [], rawR: number[] = [];
+  for (let y = 290; y < 362; y++) {
+    let x = 320; let miss = 0;
+    if (!water(320, y)) { let ok = false; for (let d = 1; d < 30 && !ok; d++) if (water(320 + d, y)) { x = 320 + d; ok = true; } else if (water(320 - d, y)) { x = 320 - d; ok = true; } if (!ok) { rawL[y] = BLIN(y); rawR[y] = BRIN(y); continue; } }
+    let l = x; miss = 0; for (let xx = x; xx > 180 && miss < 3; xx--) { if (water(xx, y)) { l = xx; miss = 0; } else miss++; }
+    let r = x; miss = 0; for (let xx = x; xx < 460 && miss < 3; xx++) { if (water(xx, y)) { r = xx; miss = 0; } else miss++; }
+    // sanity: keep close to the expected shape
+    if (Math.abs(l - BLIN(y)) > 40 || Math.abs(r - BRIN(y)) > 50) { l = BLIN(y); r = BRIN(y); }
+    rawL[y] = l; rawR[y] = r;
+  }
+  const med = (a: number[], y: number) => { const w = [-2, -1, 0, 1, 2].map((k) => a[Math.min(361, Math.max(290, y + k))]).sort((m, n) => m - n); return w[2]; };
+  for (let y = 290; y < 362; y++) { BL[y] = med(rawL, y); BR[y] = med(rawR, y) + 1; }
+}
 /** footpath centre x and half width as functions of y (bottom-left winding toward the valley) */
 export const pathX = (y: number) => {
   const s = Math.max(0, Math.min(1, (362 - y) / 60));
-  return 66 + 178 * Math.pow(s, 0.85) + 16 * Math.sin(s * 3.6) * (1 - s * 0.6);
+  return 66 + (bankL(304) - 10 - 66) * Math.pow(s, 0.85) + 16 * Math.sin(s * 3.6) * (1 - s * 0.6);
 };
 export const pathW = (y: number) => 2.5 + 15 * Math.pow(Math.max(0, (y - 298) / 64), 1.25);
 
+
+/** Ramp with crisp bands: dithering only inside a narrow transition zone (keeps big lawns clean). */
+export function sharpRamp(cols: string[], t: number, x: number, y: number, w = 0.12): string {
+  const k = Math.min(Math.max(t, 0), 0.9999) * (cols.length - 1);
+  const i = Math.floor(k), f = k - i;
+  if (f < 0.5 - w) return cols[i];
+  if (f > 0.5 + w) return cols[i + 1];
+  return ((x + y) & 1) === 0 ? cols[i] : cols[i + 1];
+}

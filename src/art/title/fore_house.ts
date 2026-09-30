@@ -2,7 +2,7 @@
 import { PixelCanvas, ramp, bay } from './kit';
 import { blob, flower, leaf, glow, thick, bez, dth, tuft } from './fore_util';
 
-const WALL = ['6', 'A', '&', 'z'];
+const WALL = ['3', '4', '&', 'z'];
 const WOOD = ['d', 'n', 'b', 'B', 't'];
 const GREEN = ['f', 'F', 'G', 'h', 'H'];
 
@@ -30,6 +30,8 @@ export function panel(p: PixelCanvas, x: number, y: number, w: number, h: number
     }
   }
   p.set(x + 1, topAt(1), '9');
+  // support struts under the panel
+  for (const i of [3, w - 5]) { const b = topAt(i) + h; for (let j = 0; j < 5; j++) { p.set(x + i, b + j, j === 0 ? '7' : 'c'); p.set(x + i + 1, b + j, '2'); } }
 }
 
 function wallT(x: number, y: number, x0: number, x1: number, yTop: number) {
@@ -84,11 +86,11 @@ function hangingPlanter(p: PixelCanvas, x: number, y: number, len: number, r: ()
 
 export function drawHouse(p: PixelCanvas, r: () => number) {
   // ---- cast shadows on the lawn (fall right and down) ----
-  for (let y = 302; y < 322; y++) for (let x = 6; x < 176; x++) {
+  for (let y = 302; y < 318; y++) for (let x = 6; x < 176; x++) {
     const edge = 116 - (y - 302) * -1.6;
     const inside = x > 18 && x < 130 + (y - 302) * 2.2;
     if (!inside) continue;
-    const dpt = 0.85 - (y - 302) * 0.03;
+    const dpt = 0.8 - (y - 302) * 0.05;
     if (dth(x, y, dpt)) p.set(x, y, y > 314 ? 'F' : 'f');
   }
 
@@ -145,9 +147,8 @@ export function drawHouse(p: PixelCanvas, r: () => number) {
     // wooden ridge cap vines
     for (let x = ax0; x <= ax1; x += 5) { const t = Math.round(topAt(x)); p.set(x, t - 1, 'G'); p.set(x + 1, t - 1, 'h'); p.set(x + 1, t - 2, 'H'); }
     // solar panel on its top
-    panel(p, 122, 262, 20, 8, 7);
-    panel(p, 144, 258, 20, 8, 5);
-    for (const lx of [126, 132, 148, 156]) { p.set(lx, 271, 'c'); p.set(lx, 270, '2'); }
+    panel(p, 120, 259, 22, 9, 6);
+    panel(p, 144, 256, 22, 9, 5);
   }
 
   // ---- main house wall ----
@@ -156,7 +157,7 @@ export function drawHouse(p: PixelCanvas, r: () => number) {
     // curved corners
     const cx = x < wx0 + 4 ? wx0 + 4 - x : x > wx1 - 4 ? x - (wx1 - 4) : 0;
     if (y > wbase - 3 && cx > 0) continue;
-    p.set(x, y, ramp(WALL, Math.max(0, Math.min(1, wallT(x, y, wx0, wx1, wtop) + 0.06 * Math.sin(y * 0.6 + x * 0.1))), x, y));
+    { const dy = y - wtop; let c = '&'; if (x < wx0 + 4) c = 'z'; else if (x > wx1 - 12) c = '%'; else if (x > wx1 - 26 && (x + y) % 2 === 0 && dy > 8) c = '%'; if (dy < 3) c = '%'; else if (dy === 3 && x % 2 === 0) c = '%'; if (x % 17 === 9 && dy > 9 && y < wbase - 8) c = c === 'z' ? '&' : c === '%' ? '3' : 'z'; p.set(x, y, c); }
   }
   // stone footing
   for (let x = wx0; x <= wx1; x++) for (let y = wbase - 4; y < wbase; y++) p.set(x, y, ((x + (y & 1) * 3) % 6 < 5) ? (y === wbase - 4 ? 'x' : (x < 60 ? 'S' : 's')) : 'C');
@@ -183,7 +184,7 @@ export function drawHouse(p: PixelCanvas, r: () => number) {
     // step + lantern
     p.rect(dx - 1, wbase - 3, dw + 2, 3, '7'); p.hline(dx - 1, dx + dw, wbase - 3, '8');
     p.set(dx + dw + 3, 280, 'n'); p.set(dx + dw + 3, 281, 'Y'); p.set(dx + dw + 3, 282, 'z'); p.set(dx + dw + 3, 283, 'y');
-    glow(p, dx + dw + 3, 282, 7, 'z', null, 0.7);
+    glow(p, dx + dw + 3, 282, 5, 'z', null, 0.5);
     p.set(dx + dw + 3, 281, 'z'); p.set(dx + dw + 3, 282, '9');
   }
 
@@ -199,7 +200,7 @@ export function drawHouse(p: PixelCanvas, r: () => number) {
         let c: string;
         if (d < 2) c = ramp(['G', 'h', 'H', 'z'], 0.55 + (1 - (x - rx0) / (rx1 - rx0)) * 0.35 - d * 0.25, x, y);
         else if (e <= 3) c = e === 1 ? 'i' : e === 2 ? 'f' : 'C';
-        else c = ramp(GREEN, 0.4 + (1 - (x - rx0) / (rx1 - rx0)) * 0.3 - d * 0.03 + 0.12 * Math.sin(x * 0.5 + y * 0.9), x, y);
+        else c = ramp(GREEN, 0.5 + (1 - (x - rx0) / (rx1 - rx0)) * 0.28 - d * 0.02 + 0.1 * Math.sin(x * 0.5 + y * 0.9), x, y);
         p.set(x, y, c);
       }
       // scalloped grassy lower fringe: drooping tufts
@@ -209,9 +210,9 @@ export function drawHouse(p: PixelCanvas, r: () => number) {
     for (let x = rx0 + 2; x <= rx1 - 2; x++) { const b0 = Math.round(bot(x)); p.set(x, b0 + 1, 'p'); p.set(x, b0 + 2, x % 2 ? 'E' : 'p'); }
     // roof flowers (clusters) and small shrubs
     const cols: [string, string, string, string][] = [['X', 'Z', 'T', 'Y'], ['N', 'A', 'M', 'Y'], ['Y', 'z', 'y', 'n'], ['9', '9', '8', 'Y']];
-    for (let i = 0; i < 26; i++) {
+    for (let i = 0; i < 44; i++) {
       const x = Math.round(rx0 + 5 + r() * (rx1 - rx0 - 10));
-      const y = Math.round(top(x) + 3 + r() * 6);
+      const y = Math.round(top(x) + 3 + r() * 10);
       const k = Math.floor(r() * 4);
       flower(p, x, y, r() < 0.4 ? 2 : 1, cols[k][0], cols[k][1], cols[k][2], cols[k][3]);
     }
@@ -225,9 +226,8 @@ export function drawHouse(p: PixelCanvas, r: () => number) {
       if (i % 3 === 1) { p.set(vx, vy + vl, 'Z'); p.set(vx + 1, vy + vl, 'X'); }
     }
     // solar panels on the ridge
-    panel(p, 70, 232, 20, 9, 5);
-    panel(p, 92, 234, 20, 9, 4);
-    for (const lx of [74, 82, 97, 106]) { p.set(lx, 241 + (lx > 90 ? 2 : 0), 'c'); p.set(lx, 242 + (lx > 90 ? 2 : 0), '2'); }
+    panel(p, 68, 229, 24, 10, 6);
+    panel(p, 94, 233, 24, 10, 5);
     // little dormer vent window + chimney-less skylight glass (teal dome)
     for (let y = 0; y < 8; y++) for (let x = 0; x < 15; x++) {
       const nx = (x - 7) / 7.4, ny = (y - 7.5) / 7.8; if (nx * nx + ny * ny > 1) continue;

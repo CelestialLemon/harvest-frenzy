@@ -1,12 +1,13 @@
 // Midground props: solarpunk buildings, bridge, boat, turbines, solar farm, cable-car.
 import { PixelCanvas, ramp, bay } from './kit';
 import { hash, shadow } from './mid_util';
+import { parseColor } from '../pixel';
 
 type RoofKind = 'green' | 'solar' | 'terra';
 type BodyKind = 'cream' | 'terra';
 
 /** Half-ellipse cap painted with a lit ramp; returns nothing. Local canvas so the outline hugs it. */
-function cap(p: PixelCanvas, cx: number, by: number, rx: number, ry: number, cols: string[], ol: string | null, seed: number, flowersOn: boolean) {
+function cap(p: PixelCanvas, cx: number, by: number, rx: number, ry: number, cols: string[], ol: string | null, seed: number, flowersOn: boolean, dith = true) {
   const w = Math.ceil(rx * 2) + 6, h = Math.ceil(ry) + 6;
   const t = new PixelCanvas(w, h);
   const c0 = w / 2, base = h - 3;
@@ -14,11 +15,15 @@ function cap(p: PixelCanvas, cx: number, by: number, rx: number, ry: number, col
     const nx = (x + 0.5 - c0) / (rx + 0.01), ny = (y + 0.5 - base) / (ry + 0.01);
     if (ny > 0 || nx * nx + ny * ny > 1) continue;
     const L = 0.55 - 0.45 * nx + 0.55 * ny * -0.6 + 0.4 * ny * 0.0;
-    t.set(x, y, ramp(cols, Math.min(1, Math.max(0, L + 0.25 * (-ny))), x, y));
+    const LL = Math.min(1, Math.max(0, L + 0.25 * (-ny)));
+    t.set(x, y, dith ? ramp(cols, LL, x, y) : cols[Math.min(cols.length - 1, Math.floor(LL * cols.length))]);
   }
   if (flowersOn) {
-    const fc = ['Z', '9', 'Y', 'N', 'A'];
-    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (t.opaque(x, y) && hash(x, y, seed) < 0.12 && y < base - 0) t.set(x, y, fc[Math.floor(hash(x, y, seed + 1) * fc.length)]);
+    const fc = ['Z', '9', 'Y', '#', 'A'];
+    for (let y = 1; y < h; y++) for (let x = 1; x < w; x++) if (t.opaque(x, y) && t.opaque(x, y + 1) && hash(x, y, seed) < 0.1) {
+      const c = fc[Math.floor(hash(x, y, seed + 1) * fc.length)];
+      t.set(x, y, c); if (hash(x, y, seed + 2) < 0.35 && t.opaque(x + 1, y)) t.set(x + 1, y, c);
+    }
   }
   if (ol) t.outline(ol);
   p.blit(t, Math.round(cx - c0), Math.round(by - base));
@@ -28,7 +33,7 @@ function cap(p: PixelCanvas, cx: number, by: number, rx: number, ry: number, col
 export function house(p: PixelCanvas, x: number, y: number, w: number, body: BodyKind, roof: RoofKind, seed: number, near: boolean) {
   const h = Math.max(4, Math.round(w * 0.55));
   const r = Math.max(2, Math.round(w * 0.28));
-  const bc = body === 'cream' ? { base: '&', hi: '9', sh: 'A', ol: 'm' } : { base: 'b', hi: 'B', sh: 'n', ol: 'm' };
+  const bc = body === 'cream' ? { base: '&', hi: '9', sh: '%', ol: 'n' } : { base: 'b', hi: 'B', sh: 'n', ol: 'm' };
   shadow(p, x + w * 0.65, y + 1, w * 0.7, Math.max(1.5, w * 0.12));
   // body mask with rounded shoulders
   const m = new PixelCanvas(w, h);
@@ -70,19 +75,20 @@ export function house(p: PixelCanvas, x: number, y: number, w: number, body: Bod
   const rx = w / 2 + (w >= 12 ? 2 : 1), ry = Math.max(2.5, w * 0.34);
   const ry0 = oy + 1;
   if (roof === 'green') {
-    cap(p, x, ry0, rx, ry, ['f', 'F', 'G', 'h'], near ? 'f' : null, seed, w >= 10);
+    cap(p, x, ry0, rx, ry, ['f', 'F', 'G', 'h'], (near || w >= 11) ? 'f' : null, seed, w >= 9);
     // hanging lip shadow
     if (w >= 10) for (let i = -Math.floor(rx) + 1; i < rx - 1; i++) shiftDown(p, Math.round(x + i), ry0 + 1);
   } else if (roof === 'solar') {
-    cap(p, x, ry0, rx, ry, ['u', 'U', 'w', 'w'], near ? 'u' : null, seed, false);
-    // sheen diagonals
-    for (let j = 0; j < ry; j++) for (let i = -Math.floor(rx); i < rx; i++) {
-      const px = Math.round(x + i), py = ry0 - j - 1 + 1;
-      if (p.opaque(px, py) && ((i + j * 2 + 40) % 5 === 0) && j > 0) p.set(px, py, 'W');
+    cap(p, x, ry0, rx, ry, ['u', 'U', 'w', 'w', 'w'], near ? 'u' : null, seed, false, false);
+    // sheen diagonals (panel cell lines) on the lit blue faces
+    const wv = parseColor('w');
+    for (let j = 0; j < ry + 1; j++) for (let i = -Math.ceil(rx); i <= rx; i++) {
+      const px = Math.round(x + i), py = ry0 - j;
+      if (p.get(px, py) === wv && (px + py * 2 + 200) % 6 === 0) p.set(px, py, 'W');
     }
-    if (w >= 10) p.set(Math.round(x - rx * 0.4), Math.round(ry0 - ry * 0.7), 'a');
+    if (w >= 10) { p.set(Math.round(x - rx * 0.45), Math.round(ry0 - ry * 0.65), 'a'); }
   } else {
-    cap(p, x, ry0, rx, ry, ['n', 'b', 'B', 'B'], near ? 'm' : null, seed, false);
+    cap(p, x, ry0, rx, ry, ['n', 'b', 'B', 'B'], near ? 'm' : null, seed, false, false);
   }
   // wood beam under roof
   if (w >= 12) p.hline(ox + 1, ox + w - 2, oy + 2, 'b');
@@ -178,58 +184,54 @@ export function lanterns(p: PixelCanvas, x0: number, y0: number, x1: number, y1:
 
 /** Arched white-and-wood footbridge across the river (deck spans x0..x1 at waterline y). */
 export function bridge(p: PixelCanvas, x0: number, x1: number, y: number) {
-  const cx = (x0 + x1) / 2, hw = (x1 - x0) / 2, rise = 13;
-  const deck = (x: number) => y - 3 - rise * (1 - Math.pow((x - cx) / hw, 2));
-  // reflection in the water (mirrored, dithered, darker)
-  for (let x = Math.round(x0 + 2); x < x1 - 2; x++) {
-    const u = (x - cx) / hw;
-    const arch = Math.sqrt(Math.max(0, 1 - Math.pow(u / 0.78, 2)));
-    const d = deck(x);
-    for (let k = 1; k <= 5; k++) if (bay(x, y + k) < 0.55 - k * 0.07) p.set(x, y + k + 0, k < 3 ? 'U' : 'I');
-    void d; void arch;
-  }
-  // body between deck and waterline, with opening
+  const cx = (x0 + x1) / 2, hw = (x1 - x0) / 2, rise = 15;
+  const deck = (x: number) => y - 5 - rise * (1 - Math.pow((x - cx) / hw, 2));
+  const openTop = (u: number) => Math.abs(u) < 0.8 ? Math.round((y - 1) - 11 * Math.pow(1 - Math.pow(u / 0.8, 2), 0.62)) : 9999;
+  const ring: [number, number][] = [];
+  // white ring / body with coloured deck on top
   for (let x = x0; x <= x1; x++) {
     const u = (x - cx) / hw;
-    const top = Math.round(deck(x));
-    const open = Math.abs(u) < 0.76 ? Math.round((y - 1) - 10.5 * Math.sqrt(1 - Math.pow(u / 0.76, 2))) : 9999;
+    const top = Math.round(deck(x)), open = openTop(u);
     for (let yy = top; yy <= y; yy++) {
-      if (yy >= open) { // opening: see through, dark inner arch underside
-        if (yy === open) p.set(x, yy, '6');
-        continue;
-      }
+      if (yy >= open) { if (yy === open) p.set(x, yy, '6'); continue; }
       let c = '9';
       if (yy === top) c = 'B';
       else if (yy === top + 1) c = 'b';
-      else if (yy > open - 3 && Math.abs(u) < 0.9) c = 'A';
-      else if (u > 0.6) c = '8';
-      else if (u < -0.85) c = '9';
+      else if (yy >= open - 2) c = '8';
+      else if (u > 0.55 && (x + yy) % 2 === 0) c = '8';
+      if (yy === top + 2 && u < -0.3) c = 'z';
       p.set(x, yy, c);
+      ring.push([x, yy]);
     }
-    // voussoir keystones
-    if (Math.abs(u) < 0.76 && (x - Math.round(cx)) % 6 === 0) p.set(x, open - 1, 'b');
+    if (Math.abs(u) < 0.8 && (x - Math.round(cx)) % 7 === 0) p.set(x, open - 1, 'b');
   }
+  // reflection in the water below (mirrored, dithered, darker)
+  for (const [x, yy] of ring) {
+    const ry = y + 1 + (y - yy) * 0.55;
+    if (ry > y + 9) continue;
+    if (bay(x, Math.round(ry)) < 0.6) p.set(x, Math.round(ry), yy < y - 6 ? 'U' : 'I');
+  }
+  for (let x = x0 + 3; x < x1 - 2; x++) if (bay(x, y + 2) < 0.4) p.set(x, y + 1, 'i');
   // abutment blocks
-  p.rect(x0 - 2, y - 5, 4, 6, 'S'); p.rect(x1 - 1, y - 5, 4, 6, 'S');
-  p.vline(x0 - 2, y - 5, y, 'x'); p.hline(x0 - 2, x0 + 1, y, 's'); p.hline(x1 - 1, x1 + 2, y, 's');
+  p.rect(x0 - 3, y - 6, 5, 7, 'S'); p.rect(x1 - 1, y - 6, 5, 7, 'S');
+  p.vline(x0 - 3, y - 6, y, 'x'); p.hline(x0 - 3, x0 + 1, y, 's'); p.hline(x1 - 1, x1 + 3, y, 's');
+  p.vline(x1 + 3, y - 6, y - 1, 'C');
   // railings: posts + rail along the deck
   for (let x = x0 + 1; x <= x1 - 1; x += 4) {
     const d = Math.round(deck(x));
-    p.vline(x, d - 3, d - 1, '9');
-    p.set(x, d - 4, 'b');
+    p.vline(x, d - 4, d - 1, '9');
   }
   for (let x = x0 + 1; x <= x1 - 1; x++) {
     const d = Math.round(deck(x));
-    p.set(x, d - 4, 'B');
-    if (x % 2 === 0) p.set(x, d - 5, 't');
+    p.set(x, d - 5, 'B');
+    if (x % 2 === 0) p.set(x, d - 6, 't');
   }
-  // hanging lanterns + flowers
-  for (const f of [0.35, 0.72]) {
+  // hanging lanterns + flowers on the arch face
+  for (const f of [0.28, 0.5, 0.72]) {
     const x = Math.round(x0 + (x1 - x0) * f), d = Math.round(deck(x));
-    p.set(x, d - 5, 'Y'); p.set(x, d - 6, 'z');
+    p.set(x, d - 6, 'Y'); p.set(x, d - 7, 'z');
   }
-  for (let x = x0 + 3; x < x1 - 2; x += 5) { const d = Math.round(deck(x)) + 3; p.set(x, d, 'G'); p.set(x, d + 1, 'h'); if (x % 2) p.set(x + 1, d + 1, 'Z'); }
-  // sunlit left rim
+  for (let x = x0 + 4; x < x1 - 3; x += 5) { const d = Math.round(deck(x)) + 3; p.set(x, d, 'G'); p.set(x, d + 1, 'h'); if (x % 2) p.set(x + 1, d + 1, 'Z'); else p.set(x - 1, d, 'Y'); }
   for (let x = x0; x < x0 + 3; x++) p.set(x, Math.round(deck(x)), 'z');
 }
 
@@ -291,7 +293,7 @@ export function makeTurbineBlades(frame: number, s: number): PixelCanvas {
       const f = u / L;
       const hw = Math.max(0.5, (0.5 + 1.35 * s * (f < 0.18 ? 0.8 + f * 1.1 : 1 - (f - 0.18) * 0.95)) * (1 - f * 0.55)) + 0.02;
       if (Math.abs(v) > hw) continue;
-      hit = f > 0.9 ? 'a' : (v > hw * 0.15 ? (far ? '7' : '8') : (far ? '8' : '9'));
+      hit = f > 0.9 ? 'a' : (v > hw * 0.15 ? (far ? '7' : (s > 0.5 ? '7' : '8')) : (far ? '8' : '9'));
       if (hw < 0.9) hit = far ? '8' : '9';
     }
     if (dx * dx + dy * dy <= hubR * hubR) hit = far ? '8' : '9';
@@ -303,18 +305,18 @@ export function makeTurbineBlades(frame: number, s: number): PixelCanvas {
 
 // ---------------------------------------------------------------- misc
 
-/** Field of solar panels on a slope; rows converge toward the vanishing point. Rect region [x0,x1]x[y0,y1]. */
-export function solarFarm(p: PixelCanvas, x0: number, x1: number, y0: number, y1: number, vpx: number, vpy: number) {
+/** Wedge-shaped field of solar panels; rows follow constant-k lines toward the vanishing point. */
+export function solarFarm(p: PixelCanvas, y0: number, y1: number, k0: number, k1: number, vpx: number, vpy: number) {
   for (let y = y0; y < y1; y++) {
-    const rowIdx = Math.floor((y - y0) / 4), inRow = (y - y0) % 4;
-    for (let x = x0; x < x1; x++) {
+    const inRow = (y - y0) % 4, rowIdx = Math.floor((y - y0) / 4);
+    const xa = Math.round(vpx + k0 * (y - vpy)), xb = Math.round(vpx + k1 * (y - vpy));
+    for (let x = xa; x <= xb; x++) {
       const k = (x - vpx) / Math.max(1, y - vpy);
-      const cell = Math.floor(k * 22 + 100);
-      let c = inRow === 3 ? 'u' : 'w';
-      if (inRow === 0) c = 'W';
-      else if (inRow === 1 && (cell + rowIdx) % 3 === 0) c = 'a';
-      else if (inRow === 2) c = 'w';
-      if (cell % 4 === 0 && inRow !== 3) c = 'U';
+      const cell = Math.floor(k * 46 + 200);
+      let c = inRow === 0 ? 'W' : inRow === 3 ? 'h' : 'w';
+      if (inRow === 1 && (cell + rowIdx * 2) % 6 === 0) c = 'a';
+      if (inRow < 3 && cell % 5 === 0) c = 'U';
+      if (x === xa || x === xb) c = 'u';
       p.set(x, y, c);
     }
   }
@@ -324,7 +326,7 @@ export function solarFarm(p: PixelCanvas, x0: number, x1: number, y0: number, y1
 export function cableCar(p: PixelCanvas, x0: number, y0: number, x1: number, y1: number, sag: number, gondolas: number[]) {
   const pt = (t: number): [number, number] => [x0 + (x1 - x0) * t, y0 + (y1 - y0) * t + Math.sin(t * Math.PI) * sag];
   let [px, py] = pt(0);
-  for (let i = 1; i <= 40; i++) { const [x, y] = pt(i / 40); p.line(px, py, x, y, '2'); px = x; py = y; }
+  for (let i = 1; i <= 40; i++) { const [x, y] = pt(i / 40); p.line(px, py, x, y, 'c'); px = x; py = y; }
   for (const [x, y] of [[x0, y0], [x1, y1]]) { p.vline(Math.round(x), Math.round(y), Math.round(y) + 6, 'n'); p.hline(Math.round(x) - 2, Math.round(x) + 2, Math.round(y), 'b'); }
   for (const t of gondolas) {
     const [x, y] = pt(t);

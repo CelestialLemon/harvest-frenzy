@@ -14,7 +14,7 @@ const rev = new Map<number, string>();
 for (const k of Object.keys(P)) rev.set(parseColor(k), k);
 
 const LIGHTER: Record<string, string> = {
-  f: 's', F: 'S', G: 'h', h: 'x', H: 'x', s: 'S', S: 'x', x: 'v', C: 's', L: 'H', t: 'z', B: 't', b: 'B', y: 't', Y: 'z',
+  f: 's', F: 'S', G: 'h', h: 'x', H: 'x', s: 'S', S: 'v', x: 'v', C: 's', L: 'H', t: 'z', B: 't', b: 'B', y: 't', Y: 'z',
   I: 'j', j: 'J', J: 'v', i: 'I', w: 'W', W: 'a', u: 'U', U: 'w', n: 'b', d: 'D', D: 'l', l: 'H', X: 'Z', Z: 'A', T: 'X',
   M: 'N', N: 'A', P: 'M', p: 'P', '2': '6', '6': '7', '7': '8', '5': '6',
 };

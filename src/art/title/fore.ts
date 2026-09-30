@@ -1,18 +1,19 @@
 // Foreground layer of the solarpunk title screen: near ground, path, river bank, hero house (left),
 // giant tree (right), framing foliage, drifting life and a soft vignette.
 import { PixelCanvas, rng, ramp, bay } from './kit';
-import { topL, topR, bankL, bankR, pathX, pathW, tuft, flower, dandelion, puff, leaf, blob, dth, dimRect } from './fore_util';
+import { sharpRamp, initBanks, topL, topR, bankL, bankR, pathX, pathW, tuft, flower, dandelion, puff, leaf, blob, dth, dimRect } from './fore_util';
 import { drawHouse, drawBeds } from './fore_house';
 import { drawTreeBack, drawTreeFront, drawFenceAndSunflowers } from './fore_tree';
 import { drawRiverBank, drawLife, drawFrame } from './fore_life';
 
+const inHouse = (x: number, y: number) => x < 184 && y < 324 && y > 200 && !(y > 318 && x > 130) && !(x > 128 && y > 312);
 const GRASS = ['f', 'F', 'G', 'h', 'H'];
 
 function groundTone(x: number, y: number) {
-  let t = 0.5 + 0.13 * Math.sin(x * 0.05 + y * 0.07) + 0.09 * Math.sin(x * 0.13 - y * 0.06 + 1.3);
+  let t = 0.52 + 0.06 * Math.sin(x * 0.02 + y * 0.03);
   // converging mown stripes toward the vanishing point
   const u = (x - 320) / Math.max(8, y - 186);
-  t += (Math.floor(u * 2.2) & 1) * 0.07;
+  t += (Math.floor(u * 2.2) & 1) * 0.1 - 0.03 * Math.sin(u * 5 + y * 0.05);
   // golden light on distant/upper ground, deeper and richer near the viewer
   t += (300 - y) * 0.004;
   return t;
@@ -30,7 +31,7 @@ function paintGround(p: PixelCanvas, side: 'L' | 'R') {
       let t = groundTone(x, y);
       // rim-lit crest, darker toward the bottom (vignette handled later)
       t += Math.max(0, 5 - d) * 0.06;
-      p.set(x, y, ramp(GRASS, Math.max(0.05, Math.min(0.95, t * 0.9 + 0.08)), x, y));
+      p.set(x, y, sharpRamp(GRASS, Math.max(0.05, Math.min(0.95, t * 0.9 + 0.08)), x, y));
     }
   }
 }
@@ -40,6 +41,7 @@ function grassDetail(p: PixelCanvas, r: () => number) {
   const place = (x0: number, x1: number, y0: number, y1: number, n: number, hMin: number, hMax: number) => {
     for (let i = 0; i < n; i++) {
       const x = Math.round(x0 + r() * (x1 - x0)), y = Math.round(y0 + r() * (y1 - y0));
+      if (inHouse(x, y)) continue;
       const inRiver = y >= 298 && x > bankL(y) - 3 && x < bankR(y) + 3;
       if (inRiver) continue;
       if (y >= 300 && Math.abs(x - pathX(y)) < pathW(y) + 2) continue;
@@ -58,6 +60,7 @@ function grassDetail(p: PixelCanvas, r: () => number) {
   for (let i = 0; i < 260; i++) {
     const left = r() < 0.5;
     const x = Math.round(left ? r() * 250 : 395 + r() * 245), y = Math.round(292 + r() * 66);
+    if (inHouse(x, y)) continue;
     if (y >= 300 && (x > bankL(y) - 2 && x < bankR(y) + 2)) continue;
     if (y >= 300 && Math.abs(x - pathX(y)) < pathW(y) + 3) continue;
     if (y < 300 && ((left && x > 258) || (!left && x < 380))) continue;
@@ -87,6 +90,7 @@ function meadow(p: PixelCanvas, r: () => number) {
     }
     pts.sort((a, b) => a[1] - b[1]);
     for (const [x, y, k, s] of pts) {
+      if (inHouse(x, y)) continue;
       if (y >= 300 && x > bankL(y) - 4 && x < bankR(y) + 4) continue;
       if (y >= 300 && Math.abs(x - pathX(y)) < pathW(y) + 3) continue;
       // stem + leaves
@@ -99,10 +103,10 @@ function meadow(p: PixelCanvas, r: () => number) {
   // left lawn: big clumps at the bottom-left and around the path
   cluster(24, 352, 9, 22, true); cluster(118, 354, 6, 16, true); cluster(196, 350, 5, 14, false);
   cluster(38, 306, 8, 18, false); cluster(168, 322, 4, 10, false); cluster(214, 316, 5, 10, false);
-  cluster(90, 326, 3, 8, false); cluster(8, 330, 4, 8, false);
+  cluster(70, 354, 6, 14, true); cluster(150, 352, 5, 10, true); cluster(90, 326, 3, 8, false); cluster(8, 330, 4, 8, false);
   // right lawn
   cluster(610, 352, 10, 24, true); cluster(468, 354, 7, 18, true); cluster(530, 351, 4, 12, false);
-  cluster(440, 318, 6, 12, false); cluster(500, 326, 4, 12, false); cluster(408, 328, 3, 8, false);
+  cluster(560, 353, 6, 14, true); cluster(420, 353, 4, 10, true); cluster(440, 318, 6, 12, false); cluster(500, 326, 4, 12, false); cluster(408, 328, 3, 8, false);
   // clover leaves (three-lobed) on the lawn
   for (let i = 0; i < 26; i++) {
     const x = Math.round(r() < 0.5 ? r() * 240 : 400 + r() * 236), y = Math.round(300 + r() * 58);
@@ -160,7 +164,7 @@ function vignette(p: PixelCanvas) {
     const dc = Math.abs(x - 320) / 320;
     let d = 0;
     if (y > 346) d = ((y - 346) / 14) * 0.62;
-    d += Math.max(0, dc - 0.7) * 1.0 * Math.max(0, (y - 300) / 60);
+    d += Math.max(0, dc - 0.78) * 0.9 * Math.max(0, (y - 310) / 50);
     if (d <= 0.02) continue;
     if (!dth(x, y, d)) continue;
     const inRiver = y >= 300 && x > bankL(y) && x < bankR(y);
@@ -187,8 +191,33 @@ function darker(v: number): string {
   return (DARK[key] = c);
 }
 
+/** tall grass, shrubs and wildflowers along the lawn crests so the horizon of the lawn is never a flat line */
+function crest(p: PixelCanvas, r: () => number) {
+  const cols: [string, string, string, string][] = [['X', 'Z', 'T', 'Y'], ['N', 'A', 'M', 'Y'], ['Y', 'z', 'y', 'n'], ['9', '9', '8', 'Y']];
+  const run = (x0: number, x1: number, top: (x: number) => number) => {
+    for (let x = x0; x < x1; x += 3 + Math.floor(r() * 3)) {
+      const y = Math.round(top(x)) + 2;
+      if (x < 184 && y < 300 && y > 260 && x > 6) continue; // house
+      if (x > 470 && x < 640 && y < 292) continue;
+      tuft(p, x, y, 4 + Math.floor(r() * 5), r, ['f', 'F', 'G', 'h'], 4 + Math.floor(r() * 2));
+      if (r() < 0.3) { const k = cols[Math.floor(r() * 4)]; const fy = y - 5 - Math.floor(r() * 4); p.set(x + 1, fy + 1, 'F'); p.set(x + 1, fy + 2, 'F'); flower(p, x + 1, fy, 1, k[0], k[1], k[2], k[3]); }
+    }
+    for (let x = x0 + 4; x < x1; x += 13 + Math.floor(r() * 9)) {
+      const y = Math.round(top(x)) + 2;
+      if (x < 184 && y < 300 && x > 6) continue;
+      if (x > 470 && x < 640 && y < 292) continue;
+      const rad = 4 + Math.floor(r() * 3);
+      blob(p, x, y - 1, rad + 1, rad * 0.8, ['f', 'F', 'G', 'h', 'H'], 0);
+      const k = cols[Math.floor(r() * 4)];
+      flower(p, x - 1, y - 3, 1, k[0], k[1], k[2], k[3]); p.set(x + 2, y - 2, k[1]);
+    }
+  };
+  run(184, 262, topL); run(378, 470, topR);
+}
+
 export function drawFore(p: PixelCanvas) {
   const r = rng(2024);
+  initBanks(p);
   paintGround(p, 'L');
   paintGround(p, 'R');
   paintPath(p, r);
@@ -196,6 +225,7 @@ export function drawFore(p: PixelCanvas) {
   drawTreeBack(p, r);
   drawHouse(p, r);
   grassDetail(p, r);
+  crest(p, r);
   meadow(p, r);
   drawBeds(p, r);
   drawTreeFront(p, r);
