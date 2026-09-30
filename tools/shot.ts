@@ -1,5 +1,5 @@
 // Headless browser driver for visual checks.
-// Usage: npx tsx tools/shot.ts '<json steps>' [url]
+// Usage: npx tsx tools/shot.ts '<json steps>' [url] [WxH viewport, default 1280x720]
 // steps: [{"click":[x,y]}, {"move":[x,y]}, {"wait":ms}, {"shot":"name"}, {"key":"Escape"}, {"eval":"js"}]
 // Coordinates are internal game pixels (640x360). Screenshots -> tools/out/shot_<name>.png
 import puppeteer from 'puppeteer-core';
@@ -14,14 +14,19 @@ const browser = await puppeteer.launch({
   args: ['--autoplay-policy=no-user-gesture-required', '--mute-audio'],
 });
 const page = await browser.newPage();
-await page.setViewport({ width: 1280, height: 720 });
+const [vw, vh] = (process.argv[4] ?? '1280x720').split('x').map(Number);
+await page.setViewport({ width: vw, height: vh });
 const logs: string[] = [];
 page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warn') logs.push(`[${m.type()}] ${m.text()}`); });
 page.on('pageerror', (e) => logs.push(`[pageerror] ${(e as Error).message}`));
 await page.goto(url, { waitUntil: 'networkidle0' });
 const toPage = async (x: number, y: number) => {
-  const r = await page.evaluate(() => { const b = document.getElementById('game')!.getBoundingClientRect(); return { x: b.left, y: b.top, w: b.width, h: b.height }; });
-  return [r.x + (x + 0.5) * (r.w / 640), r.y + (y + 0.5) * (r.h / 360)] as const;
+  const r = await page.evaluate(() => {
+    const b = document.getElementById('game')!.getBoundingClientRect();
+    const v = (window as unknown as { view: { w: number; h: number; ox: number; oy: number } }).view;
+    return { x: b.left, y: b.top, sx: b.width / v.w, sy: b.height / v.h, ox: v.ox, oy: v.oy };
+  });
+  return [r.x + (x + r.ox + 0.5) * r.sx, r.y + (y + r.oy + 0.5) * r.sy] as const;
 };
 for (const s of steps) {
   if (s.wait) await new Promise((r) => setTimeout(r, s.wait));
@@ -30,8 +35,7 @@ for (const s of steps) {
   if (s.key) await page.keyboard.press(s.key);
   if (s.eval) { const v = await page.evaluate(s.eval); if (v !== undefined) console.log('eval:', JSON.stringify(v)); }
   if (s.shot) {
-    const el = await page.$('#game');
-    await el!.screenshot({ path: `tools/out/shot_${s.shot}.png` });
+    await page.screenshot({ path: `tools/out/shot_${s.shot}.png` });
     console.log(`shot tools/out/shot_${s.shot}.png`);
   }
 }

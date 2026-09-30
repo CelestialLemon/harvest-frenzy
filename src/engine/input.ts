@@ -1,5 +1,5 @@
-// Pointer + keyboard input in internal (640x360) coordinates. Edge flags are cleared each frame by endFrame().
-import { VH, VW } from './display';
+// Pointer + keyboard input in internal (640x360 frame) coordinates; the margins map outside 0..640 / 0..360. Edge flags are cleared each frame by endFrame().
+import { view } from './display';
 
 export class Input {
   x = -100;
@@ -18,8 +18,8 @@ export class Input {
   constructor(private canvas: HTMLCanvasElement) {
     const toLocal = (e: PointerEvent) => {
       const r = canvas.getBoundingClientRect();
-      this.x = Math.floor(((e.clientX - r.left) / r.width) * VW);
-      this.y = Math.floor(((e.clientY - r.top) / r.height) * VH);
+      this.x = Math.floor(((e.clientX - r.left) / r.width) * view.w) - view.ox;
+      this.y = Math.floor(((e.clientY - r.top) / r.height) * view.h) - view.oy;
     };
     canvas.addEventListener('pointermove', (e) => { toLocal(e); this.inside = true; });
     canvas.addEventListener('pointerenter', () => { this.inside = true; });
