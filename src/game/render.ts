@@ -678,8 +678,10 @@ export class WorldRenderer {
     const jx = p.rev ? (Math.floor(this.time * 30) % 2) : 0;
     const x = Math.round(p.x) + jx, y = TRUCK_HOME.y - bump - Math.round(p.hop);
     this.shadow(c, x + ts.w / 2, TRUCK_HOME.y + ts.h - 2, ts.w - 4, 0.22, 7);
-    this.drawX(c, 'truck', frame, x + ts.ox, y + ts.oy, { flip: p.flip, sx: p.sx, px: x + ts.w / 2, py: y + ts.h });
-    if (g.truck.state === 'home' && (hover.kind === 'truck' || hover.kind === 'warehouse')) this.highlight(c, 'truck', frame, x + ts.ox, y + ts.oy);
+    // draw() mirrors the anchor on flip, so a top-left-anchored sprite must be placed by its right edge to stay put
+    const ax = x + (p.flip ? ts.w - ts.ox : ts.ox);
+    this.drawX(c, 'truck', frame, ax, y + ts.oy, { flip: p.flip, sx: p.sx, px: x + ts.w / 2, py: y + ts.h });
+    if (g.truck.state === 'home' && (hover.kind === 'truck' || hover.kind === 'warehouse')) this.highlight(c, 'truck', frame, ax, y + ts.oy, p.flip);
   }
 
   private drawHeli(c: CanvasRenderingContext2D, h: ReturnType<WorldRenderer['heliPose']>, hover: Hover) {
@@ -701,8 +703,9 @@ export class WorldRenderer {
       this.drawX(c, 'heli_cargo', 0, x + s.w / 2, y + s.h - 4, { rot: swing, px: x + s.w / 2, py: y + s.h - 4 });
       void cs;
     }
-    this.drawX(c, name, frame, x + s.ox, y + s.oy, { flip: h.flip, sx: h.sx, px: x + s.w / 2, py: y + s.h });
-    if (hover.kind === 'heli' && this.game.heli.state === 'home') this.highlight(c, name, frame, x + s.ox, y + s.oy);
+    const ax = x + (h.flip ? s.w - s.ox : s.ox); // see drawTruck: keep the flipped sprite over its own position
+    this.drawX(c, name, frame, ax, y + s.oy, { flip: h.flip, sx: h.sx, px: x + s.w / 2, py: y + s.h });
+    if (hover.kind === 'heli' && this.game.heli.state === 'home') this.highlight(c, name, frame, ax, y + s.oy, h.flip);
   }
 
   private drawEntities(c: CanvasRenderingContext2D, hover: Hover) {
