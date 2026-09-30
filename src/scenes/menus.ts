@@ -1,6 +1,7 @@
 // Title, world map and upgrade shop scenes.
 import { audio } from '../audio';
 import { MAP_NODES } from '../art/scenes';
+import { CLOUD_COUNT, TURBINES } from '../art/title';
 import { drawBackdrop, fillView } from '../engine/display';
 import { animFrame, draw, drawBC, drawTL, sprite } from '../engine/sprites';
 import { COLORS, fmtTime } from '../engine/ui';
@@ -36,7 +37,22 @@ export class TitleScene implements Scene {
     const { ui } = this.app;
     this.t += dt;
     drawBackdrop(ctx, sprite('title_bg').frames[0]);
-    // drifting clouds are part of the bg; add a few hopping chickens for life
+    // living overlays on the baked backdrop: spinning turbines, drifting clouds and an airship
+    TURBINES.forEach((tb, i) => draw(ctx, `title_rotor${i}`, animFrame(`title_rotor${i}`, this.t * (1 - tb.s * 0.35) + i, 4 + tb.s * 4), tb.x, tb.y));
+    // drifters fade in from the left edge and fade out before the logo / big tree so they never cross them
+    const fade = (x: number, w: number, out: number) => Math.max(0, Math.min(1, (x + w) / 40, (out - (x + w)) / 40));
+    for (let i = 0; i < CLOUD_COUNT; i++) {
+      const c = sprite(`title_cloud${i}`), span = 300 + c.w * 2;
+      const x = ((this.t * (2.5 + i * 0.9) + i * 110) % span) - c.w;
+      const a = 0.85 * fade(x, c.w, 250);
+      if (a > 0) drawTL(ctx, `title_cloud${i}`, 0, Math.round(x), 22 + i * 17 + (i % 2) * 8, { alpha: a });
+    }
+    {
+      const s2 = sprite('title_airship'), x = ((this.t * 6 + 30) % (520 + s2.w * 2)) - s2.w;
+      const a = fade(x, s2.w, 440);
+      if (a > 0) drawTL(ctx, 'title_airship', 0, Math.round(x), 92 + Math.round(Math.sin(this.t * 0.8) * 3), { alpha: a });
+    }
+    // a few hopping chickens for life
     for (let i = 0; i < 3; i++) {
       const x = ((this.t * (10 + i * 4) + i * 230) % 760) - 60;
       drawBC(ctx, 'chicken_walk', animFrame('chicken_walk', this.t + i, 8), x, 322 + i * 9);

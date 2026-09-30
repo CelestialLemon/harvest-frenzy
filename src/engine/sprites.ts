@@ -4,11 +4,12 @@ import { sprites as creatures } from '../art/sprites/creatures';
 import { sprites as world } from '../art/sprites/world';
 import { sprites as items } from '../art/sprites/items';
 import { sprites as ui } from '../art/sprites/ui';
-import { titleBackground, logo, mapBackground, mapNode } from '../art/scenes';
+import { logo, mapBackground, mapNode } from '../art/scenes';
+import { titleBackgroundSprite, titleOverlaySprites } from '../art/title';
 
 const defs: Record<string, SpriteDef> = {
   ...creatures, ...world, ...items, ...ui,
-  title_bg: titleBackground, logo, map_bg: mapBackground, map_node: mapNode,
+  title_bg: titleBackgroundSprite, ...titleOverlaySprites, logo, map_bg: mapBackground, map_node: mapNode,
 };
 
 export interface Sprite {

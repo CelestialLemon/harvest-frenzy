@@ -9,9 +9,9 @@ const steps = JSON.parse(process.argv[2] ?? '[{"wait":1500},{"shot":"title"}]');
 const url = process.argv[3] ?? 'http://localhost:5173/';
 mkdirSync('tools/out', { recursive: true });
 const browser = await puppeteer.launch({
-  executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+  executablePath: process.env.CHROME_PATH ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
   headless: true,
-  args: ['--autoplay-policy=no-user-gesture-required', '--mute-audio'],
+  args: ['--autoplay-policy=no-user-gesture-required', '--mute-audio', '--no-sandbox'],
 });
 const page = await browser.newPage();
 const [vw, vh] = (process.argv[4] ?? '1280x720').split('x').map(Number);
