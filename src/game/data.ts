@@ -27,15 +27,15 @@ export interface AnimalDef {
 }
 
 export const ANIMALS: Record<AnimalId, AnimalDef> = {
-  chicken: { id: 'chicken', name: 'Chicken', cost: 100, product: 'egg', produceTime: 8, foodTime: 12, bite: 0.25, starveTime: 12, speed: 22, size: [16, 16], sellPrice: 50 },
-  sheep: { id: 'sheep', name: 'Sheep', cost: 1000, product: 'wool', produceTime: 12, foodTime: 14, bite: 0.2, starveTime: 16, speed: 16, size: [24, 20], sellPrice: 500 },
-  ostrich: { id: 'ostrich', name: 'Ostrich', cost: 4000, product: 'feather', produceTime: 16, foodTime: 16, bite: 0.2, starveTime: 18, speed: 26, size: [24, 32], sellPrice: 2000 },
-  cow: { id: 'cow', name: 'Cow', cost: 6000, product: 'milk', produceTime: 18, foodTime: 18, bite: 0.17, starveTime: 20, speed: 12, size: [32, 26], sellPrice: 3000 },
+  chicken: { id: 'chicken', name: 'Chicken', cost: 100, product: 'egg', produceTime: 14, foodTime: 16, bite: 0.25, starveTime: 18, speed: 22, size: [16, 16], sellPrice: 50 },
+  sheep: { id: 'sheep', name: 'Sheep', cost: 1000, product: 'wool', produceTime: 12, foodTime: 14, bite: 0.2, starveTime: 20, speed: 16, size: [24, 20], sellPrice: 500 },
+  ostrich: { id: 'ostrich', name: 'Ostrich', cost: 4000, product: 'feather', produceTime: 16, foodTime: 16, bite: 0.2, starveTime: 22, speed: 26, size: [24, 32], sellPrice: 2000 },
+  cow: { id: 'cow', name: 'Cow', cost: 6000, product: 'milk', produceTime: 18, foodTime: 18, bite: 0.17, starveTime: 24, speed: 12, size: [32, 26], sellPrice: 3000 },
 };
 
 export interface PetDef { id: PetId; name: string; cost: number; speed: number; desc: string }
 export const PETS: Record<PetId, PetDef> = {
-  cat: { id: 'cat', name: 'Cat', cost: 1500, speed: 42, desc: 'Collects products for you' },
+  cat: { id: 'cat', name: 'Cat', cost: 1500, speed: 56, desc: 'Collects products for you' },
   dog: { id: 'dog', name: 'Dog', cost: 2000, speed: 55, desc: 'Chases predators away' },
 };
 
@@ -51,11 +51,11 @@ export interface ItemDef {
 const it = (id: ItemId, name: string, price: number, size = 1, life = 22, buy?: number): ItemDef => ({ id, name, price, size, life, buy });
 
 export const ITEMS: Record<ItemId, ItemDef> = {
-  egg: it('egg', 'Egg', 10),
+  egg: it('egg', 'Egg', 15),
   wool: it('wool', 'Wool', 60),
   feather: it('feather', 'Feather', 300),
   milk: it('milk', 'Milk', 400),
-  egg_powder: it('egg_powder', 'Egg Powder', 35, 1, 40),
+  egg_powder: it('egg_powder', 'Egg Powder', 40, 1, 40),
   flour: it('flour', 'Flour', 10, 1, 40, 20),
   cookie: it('cookie', 'Cookie', 120, 1, 40),
   cake: it('cake', 'Cake', 350, 1, 40),

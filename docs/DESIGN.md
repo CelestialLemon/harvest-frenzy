@@ -74,17 +74,21 @@ buildings show front facade + roof. Light comes from the **top-left**. Shadows a
 | arctic | Frosty Peaks | 21–30 | snow, pines, ice | polar_bear | cow; creamery, cheese factory, ice cream factory |
 
 ### Animals
-| id | cost | product | produce every (fed seconds) |
-|----|------|---------|-----------------------------|
-| chicken | $100 | egg | 8 |
-| sheep | $1,000 | wool | 12 |
-| ostrich | $4,000 | feather | 16 |
-| cow | $6,000 | milk | 18 |
+| id | cost | product | produce every (fed seconds) | belly lasts | starves after |
+|----|------|---------|-----------------------------|-------------|---------------|
+| chicken | $100 | egg | 14 | 16s | 18s |
+| sheep | $1,000 | wool | 12 | 14s | 20s |
+| ostrich | $4,000 | feather | 16 | 16s | 22s |
+| cow | $6,000 | milk | 18 | 18s | 24s |
 
-Pets: **cat** (collects products) $1,500 · **dog** (chases predators) $2,000.
+Chickens are deliberately slower than their price suggests: they are cheap, so players buy many, and
+eggs are the lowest value-per-warehouse-unit good. At 14s, ~3-4 chickens match one Egg Powder Plant (4s).
+
+Pets: **cat** (collects products, 56 px/s, scoops up anything within 14px of its target) $1,500 ·
+**dog** (chases predators) $2,000.
 
 ### Products (sell price, warehouse units)
-egg 10 · wool 60 · feather 300 · milk 400 · egg_powder 35 · flour (buy 20 / sell 10) · cookie 120 · cake 350 ·
+egg 15 · wool 60 · feather 300 · milk 400 · egg_powder 40 · flour (buy 20 / sell 10) · cookie 120 · cake 350 ·
 yarn 150 · fabric 300 · buttons (buy 50 / sell 25) · shirt 650 · pillow 1200 · hat 2200 · cream 900 ·
 cheese 2000 · ice_cream 1500 · caged bear 500 / lion 600 / polar bear 700 (5 units each).
 
@@ -238,3 +242,13 @@ export const audio: {
 well (capacity 5/7/10/14, refill time 3/2.4/1.8/1.2s) · warehouse (30/45/65/90 units) · truck (20/30/45/65 units, trip 20/17/14/11s) ·
 helicopter (6/10/16 units, trip 16/13/10s) · cage (clicks to trap 5/4/3/2, cage holds 15/20/25/30s).
 Costs per next level: 3★, 6★, 10★.
+
+## Balancing
+`npx tsx tools/bot.ts 1-30 --runs 9 --apm N --json` plays every level headlessly. The bot acts like a sensible
+human: it builds what the goals need, saves up for goal animals, buys a cat/dog, and lets surplus cheap goods rot
+when it is short on clicks. Besides clear time it reports lost animals, expired/produced products, time with a
+full warehouse, how busy the player was, and when each goal finished. Run it at 60 APM (a strong player) and
+40 APM (a relaxed one); 130 APM is superhuman and hides pressure problems (it never loses a product).
+
+Medal times: gold = round5(60-APM median × 1.1 + 15), silver = round5(max(40-APM median × 1.15 + 20, gold × 1.35)).
+Level 1 stays at 60/100. Each region's clear times should rise towards its last level, and level 30 is the longest.

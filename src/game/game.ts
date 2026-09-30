@@ -594,6 +594,9 @@ export class Game {
         if (this.moveToward(pet, g.x, g.y + 1, def.speed, dt)) {
           g.claimed = false;
           if (!this.collectItem(g, true)) { pet.state = 'idle'; pet.t = 3; return; }
+          // scoop up whatever else lies within paw's reach
+          const near = this.items.filter((o) => !o.claimed && o.z <= 1 && dist(o.x, o.y, pet.x, pet.y) < 14).slice(0, 2);
+          for (const o of near) if (!this.collectItem(o, true)) break;
           pet.state = 'idle'; pet.t = 0.35;
         }
         return;
