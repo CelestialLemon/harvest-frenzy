@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cookie Factory — Before & After</title>
+<style>
+  *{box-sizing:border-box}body{margin:0;background:#171e1c;color:#f8f2df;font:16px/1.5 system-ui,sans-serif}
+  main{max-width:1060px;margin:48px auto;padding:0 24px}small{color:#b5c599;letter-spacing:.14em;font-size:11px;text-transform:uppercase}
+  h1{font-size:40px;letter-spacing:-.045em;margin:8px 0}p{color:#b9c6bc;margin:8px 0 24px}
+  .toolbar{display:flex;gap:8px;margin:28px 0 20px}button,a{font:inherit}button{border:1px solid #566458;background:transparent;color:#f8f2df;padding:8px 18px;border-radius:24px;cursor:pointer}
+  button[aria-pressed=true]{background:#fbb954;color:#2e222f;border-color:#fbb954}
+  .cards{display:grid;grid-template-columns:1fr 1fr;gap:24px}.card{background:#26312c;border:1px solid #435148;border-radius:16px;overflow:hidden}
+  .top{display:flex;justify-content:space-between;align-items:center;padding:18px 24px}.top h2{font-size:20px;margin:0}.tag{font-size:11px;color:#b9c6bc;text-transform:uppercase;letter-spacing:.1em}
+  .stage{display:flex;justify-content:center;align-items:center;min-height:352px;background:#7ba05b}
+  .sprite{--fw:360px;--fh:320px}
+  .sprite,.frame{--frame:0;width:var(--fw);height:var(--fh);background-size:calc(var(--fw) * var(--frame-count)) var(--fh);background-position:calc(-1 * var(--fw) * var(--frame)) 0;image-rendering:pixelated;background-repeat:no-repeat;flex-shrink:0}
+  .before{--frame-count:3;background-image:url('cookie-factory-before.png')}.after{--frame-count:13;background-image:url('cookie-factory-v2.png')}
+  .notes{padding:20px 24px;min-height:88px;font-size:14px;color:#c6d0c5}.film{padding:20px 24px;border-top:1px solid #435148}
+  .frames{display:flex;gap:12px;margin-top:12px;overflow-x:auto;padding-bottom:8px}.frame{--fw:144px;--fh:128px}
+  figure{margin:0}figcaption{font-size:11px;color:#b9c6bc;text-align:center;margin-top:8px}
+  .f1{--frame:1}.f2{--frame:2}
+  footer{display:flex;justify-content:space-between;gap:20px;margin-top:28px;color:#b9c6bc;font-size:13px}a{color:#fbb954;text-decoration:none}a:hover{text-decoration:underline}
+  @media(max-width:1000px){.sprite{--fw:216px;--fh:192px}.stage{min-height:224px}.frame{--fw:72px;--fh:64px}.cards{gap:16px}.top,.film,.notes{padding:16px}.notes{min-height:132px;font-size:13px}.frames{gap:8px}.film small{font-size:9px}}
+  @media(max-width:800px){main{margin:24px auto}h1{font-size:32px}footer{flex-direction:column}}
+  @media(max-width:520px){.cards{grid-template-columns:1fr}.notes{min-height:0}}
+</style>
+<main>
+  <small>Harvest Frenzy · Art upgrade</small>
+  <h1>Cookie Factory</h1>
+  <p>A clearer silhouette, a warmer shopfront, and cookies you can see being made.</p>
+  <div class="toolbar" aria-label="Animation state">
+    <button aria-pressed="true" data-state="idle">Idle</button>
+    <button aria-pressed="false" data-state="working">Working animation</button>
+  </div>
+  <div class="cards">
+    <section class="card">
+      <div class="top"><h2>Before</h2><span class="tag">Original</span></div>
+      <div class="stage"><div class="sprite before" role="img" aria-label="Original cookie factory sprite"></div></div>
+      <div class="notes">Flat facade, small cookie sign, and working frames differentiated mainly by window light and smoke.</div>
+      <div class="film"><small>All three frames</small><div class="frames">
+        <figure><div class="frame before"></div><figcaption>Idle</figcaption></figure>
+        <figure><div class="frame before f1"></div><figcaption>Working 1</figcaption></figure>
+        <figure><div class="frame before f2"></div><figcaption>Working 2</figcaption></figure>
+      </div></div>
+    </section>
+    <section class="card">
+      <div class="top"><h2>After</h2><span class="tag" id="after-phase">Idle</span></div>
+      <div class="stage"><div class="sprite after" role="img" aria-label="Improved cookie factory with cookie badge and conveyor"></div></div>
+      <div class="notes">12 working frames: smoke rises and dissolves, cookies travel right, belt seams advance, and the drive wheel rotates.</div>
+      <div class="film"><small>Idle + 12 working frames · Scroll to inspect</small><div class="frames" id="after-frames"></div></div>
+    </section>
+  </div>
+  <footer><span>72 × 64 per frame · Idle + 12 working frames · 12 FPS · Transparent RGBA</span>
+    <span><a href="cookie-factory-v2.png" download>Download sheet</a> · <a href="cookie-factory-v2.json" download>Frame metadata</a></span></footer>
+</main>
+<script type="module">
+  const meta = await fetch('cookie-factory-v2.json').then(response=>response.json());
+  const before = document.querySelector('.sprite.before'), after = document.querySelector('.sprite.after');
+  after.style.setProperty('--frame-count',String(meta.frames.length));
+  for (const [index, frame] of meta.frames.entries()) {
+    const figure = document.createElement('figure'), image = document.createElement('div'), caption = document.createElement('figcaption');
+    image.className = 'frame after'; image.style.setProperty('--frame',String(index));
+    image.style.setProperty('--frame-count',String(meta.frames.length));
+    caption.textContent = index === 0 ? 'Idle' : `Work ${index}`;
+    figure.append(image,caption); document.querySelector('#after-frames').append(figure);
+  }
+  let working = false, started = 0;
+  document.querySelectorAll('button[data-state]').forEach(button=>button.addEventListener('click',()=>{
+    working = button.dataset.state === 'working'; started = performance.now();
+    document.querySelectorAll('button[data-state]').forEach(other=>other.setAttribute('aria-pressed',String(other===button)));
+  }));
+  function animate(now) {
+    const elapsed = (now - started) / 1000;
+    const phase = Math.floor(elapsed * meta.fps) % meta.animations.working.length;
+    const frame = working ? meta.animations.working[phase] : 0;
+    before.style.setProperty('--frame',String(working ? 1 + Math.floor(elapsed * 5) % 2 : 0));
+    after.style.setProperty('--frame',String(frame));
+    document.querySelector('#after-phase').textContent = working ? `Work ${phase + 1}/${meta.animations.working.length}` : 'Idle';
+    requestAnimationFrame(animate);
+  }
+  requestAnimationFrame(animate);
+</script>
+</html>

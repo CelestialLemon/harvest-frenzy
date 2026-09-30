@@ -1,4 +1,4 @@
-// Workshops: 72x64, 3 frames (f0 idle, f1-f2 working). Anchor top-left.
+// Workshops: 72x64, f0 idle, remaining frames working. Anchor top-left.
 import { PixelCanvas, type DrawSprite } from '../../pixel';
 import {
   part, planksH, planksV, bricks, stones, win, door, smoke, signBoard, foundation, hipRoof, gableRoof,
@@ -6,7 +6,7 @@ import {
 } from './common';
 
 const W = 72, H = 64;
-const ws = (draw: (p: PixelCanvas, f: number) => void): DrawSprite => ({ w: W, h: H, frames: 3, fps: 5, ox: 0, oy: 0, draw });
+const ws = (draw: (p: PixelCanvas, f: number) => void, frames = 3, fps = 5): DrawSprite => ({ w: W, h: H, frames, fps, ox: 0, oy: 0, draw });
 
 /** Facade block with texture, eave shadow and outline. */
 function walls(p: PixelCanvas, x: number, y: number, w: number, h: number, tex: (q: PixelCanvas) => void, shadow: string, ol = '0') {
@@ -72,52 +72,137 @@ export const powder_plant = ws((p, f) => {
 });
 
 // ---------------------------------------------------------------- Bakery
-const BRICK: Shades = { d: 'n', m: 'R', l: '3', h: 'e' };
+const BRICK: Shades = { d: 'r', m: 'n', l: 'B', h: 'o' };
 export const bakery = ws((p, f) => {
-  hipRoof(p, 3, 68, 13, 34, 6, { d: 'n', m: 'e', l: 'o', h: '%' }, { rh: 3, sw: 5 });
+  const phase = Math.max(0, f - 1); // 12 forward phases; f0 is never part of the working loop.
+  // A sunlit shopfront and darker service wall give the small footprint depth.
+  foundation(p, 5, 59, 54, 4);
+  walls(p, 7, 33, 39, 26, (q) => {
+    q.rect(7, 33, 39, 26, '&');
+    q.rect(7, 33, 39, 4, '%');
+    q.hline(9, 43, 37, '9');
+    bricks(q, 7, 53, 39, 6, BRICK, 6, 3);
+    q.hline(7, 45, 52, 'n');
+    for (const x of [7, 44]) { q.rect(x, 37, 2, 16, 'n'); q.vline(x, 38, 51, 'B'); }
+  }, 'n');
   part(p, (q) => {
-    q.rect(51, 11, 8, 12, 'R');
-    bricks(q, 51, 11, 8, 12, BRICK, 4, 3);
-    q.rect(50, 9, 10, 3, '6'); q.hline(50, 59, 9, '7');
+    q.poly([[46, 33], [57, 30], [57, 57], [46, 60]], '%');
+    bricks(q, 46, 52, 12, 8, { d: 'r', m: 'n', l: 'b' }, 5, 3);
+    q.vline(46, 35, 58, 'm'); q.vline(56, 34, 55, 'n');
   });
-  if (f > 0) smoke(p, 54.5, 8, f - 1);
-  walls(p, 7, 35, 58, 24, (q) => {
-    q.rect(7, 35, 58, 24, '&');
-    // plaster speckle shading
-    for (let y = 35; y < 59; y++) for (let x = 7; x < 65; x++) if ((x * 7 + y * 13) % 23 === 0) q.paint(x, y, '%');
-    bricks(q, 7, 51, 58, 8, BRICK, 6, 3);
-    // timber posts
-    for (const bx of [7, 64]) for (let y = 35; y < 51; y++) q.paint(bx, y, 'n');
-    for (let x = 7; x < 65; x++) q.paint(x, 50, 'n');
-  }, '%');
-  foundation(p, 5, 59, 62, 5);
-  // windows with striped awnings
-  for (const wx of [12, 47]) {
-    win(p, wx, 42, 13, 9, { frame: 'n', lit: f > 0, sill: 'B' });
-    part(p, (q) => {
-      for (let x = wx - 2; x < wx + 15; x++) for (let y = 37; y < 41; y++) q.set(x, y, Math.floor((x - wx + 2) / 3) % 2 ? '9' : 'Q');
-      for (let x = wx - 2; x < wx + 15; x++) if ((x - wx + 2) % 3 === 1) q.set(x, 41, Math.floor((x - wx + 2) / 3) % 2 ? '9' : 'Q');
-      for (let x = wx - 2; x < wx + 15; x++) q.set(x, 37, Math.floor((x - wx + 2) / 3) % 2 ? '9' : 'e');
-    });
-  }
-  // loaves in windows when working
-  if (f > 0) for (const wx of [13, 48]) { p.grid(wx + 2, 47, ['.nbbn.', 'nbBBbn'], {}); p.grid(wx + 7, 47, ['.nbbn', 'nbBbn']); }
-  door(p, 31, 43, 11, 16, { d: 'n', m: 'b', l: 'B' });
-  step(p, 29, 15);
-  // hanging round cookie sign on roof
-  part(p, (q) => { q.line(30, 15, 33, 18, '2'); q.line(42, 15, 39, 18, '2'); }, null);
+
+  // Hand-laid terracotta tiles; the shaded hip is a separate roof plane.
+  hipRoof(p, 3, 49, 17, 34, 8, { d: 'R', m: 'e', l: 'o', h: '%' },
+    { rh: 4, sw: 5, fascia: 'n', ol: 'r' });
   part(p, (q) => {
-    q.circle(36, 25, 8, 'B');
-    for (let y = 16; y < 34; y++) for (let x = 27; x < 46; x++) {
-      if (!q.opaque(x, y)) continue;
-      const dx = x + 0.5 - 36, dy = y + 0.5 - 25;
-      if (dx + dy > 6) q.set(x, y, 'b');
-      else if (dx + dy < -7) q.set(x, y, 't');
+    q.poly([[41, 17], [53, 20], [61, 32], [50, 35]], 'R');
+    for (let y = 20; y < 34; y++) for (let x = 42; x < 61; x++) {
+      if ((y - 20) % 4 === 0) q.paint(x, y, 'e');
+      else if ((x + Math.floor((y - 20) / 4) * 2) % 5 === 0) q.paint(x, y, 'r');
     }
-    for (const [cx, cy] of [[33, 21], [38, 22], [35, 26], [40, 27], [31, 26], [36, 30]]) { q.set(cx, cy, 'm'); q.set(cx + 1, cy, 'n'); q.set(cx, cy + 1, 'n'); }
-    q.set(32, 20, 'z'); q.set(33, 19, 't');
+    q.line(42, 18, 50, 33, 'o'); q.line(51, 34, 60, 32, 'b');
+  }, 'r');
+  p.hline(5, 48, 35, 'B'); p.hline(8, 43, 36, 'm');
+
+  // Steam has deliberate headroom: no clipped puffs at the frame boundary.
+  part(p, (q) => {
+    q.rect(47, 14, 7, 12, 'n');
+    bricks(q, 47, 14, 7, 12, BRICK, 4, 3);
+    q.rect(46, 12, 9, 3, '6'); q.hline(46, 54, 12, '8');
+    q.hline(48, 52, 13, 'c');
   });
-});
+  if (f > 0) part(p, (q) => {
+    // Staggered particle lifetimes: rise, expand, dissolve, then emit at the mouth.
+    // Only the disappearing particle resets; a visible puff never travels down.
+    for (const offset of [0, 6]) {
+      const age = (phase + offset) % 12;
+      const x = 50 + age * .35, y = 10.5 - age * .75;
+      const r = age < 8 ? 1 + age * .17 : Math.max(.55, 2.2 - (age - 8) * .55);
+      q.circle(x, y, r, age >= 9 ? '7' : '8');
+      if (age < 9) q.circle(x - .5, y - .5, Math.max(.5, r - .6), '9');
+    }
+  }, null);
+
+  // Cookie display, striped scalloped canopy, and a proper round-topped door.
+  win(p, 12, 44, 14, 9, { frame: 'n', glass: 'w', glass2: 'u', lit: f > 0, cross: false, sill: '&' });
+  p.hline(13, 24, 50, 'b');
+  for (const x of [16, 22]) {
+    p.circle(x, 49, 2, 't'); p.set(x, 48, 'm'); p.set(x + 1, 49, 'n');
+  }
+  p.vline(19, 44, 49, 'n');
+  part(p, (q) => {
+    q.poly([[10, 39], [27, 39], [29, 42], [9, 42]], '9');
+    for (let x = 9; x <= 29; x++) {
+      const red = Math.floor((x - 9) / 3) % 2 === 0;
+      for (let y = 39; y <= 42; y++) q.paint(x, y, red ? (y === 39 ? '$' : 'Q') : (y === 42 ? '&' : '9'));
+      q.set(x, 43, red ? 'R' : '&');
+      if ((x - 9) % 3 === 1) q.set(x, 44, red ? 'R' : '&');
+    }
+  }, 'm');
+  part(p, (q) => {
+    q.circle(36, 45, 5, 'n'); q.rect(31, 45, 10, 14, 'n');
+    q.circle(36, 45, 4, 'B'); q.rect(32, 45, 8, 14, 'B');
+    for (const x of [34, 37, 39]) q.vline(x, 45, 58, 'b');
+    q.hline(32, 39, 51, 'm'); q.hline(32, 39, 56, 'm');
+    q.set(38, 52, 'Y'); q.set(38, 53, 'n');
+  }, 'm');
+  p.grid(34, 44, ['.nn.', 'naWn', 'nWWn', 'nnnn']);
+  step(p, 30, 13);
+
+  // Big toasted cookie badge reads clearly even at native game resolution.
+  p.rect(22, 29, 2, 7, 'm'); p.rect(31, 29, 2, 7, 'm');
+  part(p, (q) => {
+    q.circle(27, 24, 9, 'b'); q.circle(26, 23, 8, 't');
+    q.ring(26, 23, 7, 7, 'B');
+    q.line(21, 18, 24, 16, 'z'); q.set(20, 19, 'z');
+    for (const [x, y] of [[25, 19], [30, 20], [21, 23], [26, 25], [31, 26], [24, 29]]) {
+      q.rect(x, y, 2, 2, 'm'); q.set(x, y, 'd'); q.set(x + 1, y + 1, 'n');
+    }
+    q.set(23, 21, 'B'); q.set(28, 28, 'B');
+  }, 'm');
+
+  // Teal oven hatch and moving cookies communicate actual factory production.
+  part(p, (q) => {
+    q.rect(49, 40, 8, 12, 'i'); q.hline(49, 56, 40, 'j');
+    q.rect(51, 43, 5, 7, 'c');
+    if (f > 0) {
+      q.rect(51, 47, 5, 3, 'R');
+      const flames = [['.y.', 'yYy'], ['y..', 'Yyy'], ['.yy', 'yYY'], ['..y', 'yyY']];
+      q.grid(52, 46, flames[Math.floor(phase / 3)]);
+    }
+    q.rect(48, 39, 10, 2, 'I'); q.hline(48, 57, 39, 'j');
+  }, 'f');
+  part(p, (q) => {
+    q.rect(54, 53, 2, 7, 'i'); q.rect(67, 53, 2, 7, 'i');
+    q.hline(53, 57, 60, 'c'); q.hline(66, 70, 60, 'c');
+    q.rect(52, 50, 18, 5, 'I'); q.rect(53, 50, 16, 2, 'c');
+    q.hline(52, 69, 49, 'j'); q.hline(53, 68, 54, 'i');
+    const travel = f === 0 ? 0 : phase;
+    for (let x = 53; x < 69; x++) if ((x - travel) % 3 === 0) q.set(x, 51, 's');
+    const cookies = new PixelCanvas(W, H);
+    for (let slot = 0; slot < 5; slot++) {
+      // Six-pixel spacing makes frame 12 -> frame 1 another one-pixel advance.
+      const x = 50 + slot * 6 + (travel % 6);
+      cookies.ellipse(x, 49, 2, 1.5, 'b'); cookies.ellipse(x, 48, 2, 1.5, 't');
+      cookies.set(x - 1, 47, 'm'); cookies.set(x, 48, 'm');
+    }
+    // Clip cookies as they emerge from the hatch and leave the far end.
+    for (let y = 46; y <= 50; y++) for (let x = 53; x <= 69; x++) {
+      if (cookies.opaque(x, y)) q.px[y * W + x] = cookies.get(x, y);
+    }
+    q.circle(64, 55, 2, 'b'); q.circle(64, 55, 1, 'Y');
+    const angle = travel * Math.PI / 6 - Math.PI / 2;
+    q.set(64 + Math.round(Math.cos(angle)), 55 + Math.round(Math.sin(angle)), 'd');
+  }, 'f');
+
+  // A tied flour sack and small planter finish the silhouette without noise.
+  part(p, (q) => {
+    q.ellipse(5, 57, 3, 4, 't'); q.rect(3, 52, 4, 2, '&');
+    q.hline(3, 6, 54, 'b'); q.vline(3, 56, 59, '&');
+    q.grid(4, 56, ['nn', 'n.']);
+  }, 'n');
+  p.grid(44, 55, ['..f..', '.fGf.', 'fGhGf', '.nnn.', '.bBn.', '..n..']);
+}, 13, 12);
 
 // ---------------------------------------------------------------- Cake Shop
 const PINKW: Shades = { d: 'X', m: 'Z', l: 'A' };
