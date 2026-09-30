@@ -1,13 +1,13 @@
 // Headless balance bot: plays levels through the Game simulation with a limited click rate.
-// Usage: npx tsx tools/bot.ts [levels e.g. 1-10] [--runs 5] [--apm 120] [--stars auto|N] [--verbose]
+// Usage: npx tsx tools/bot.ts [levels e.g. 1-10] [--runs 5] [--apm 120] [--stars auto|N] [--nopets] [--verbose] [--json]
 import { Game, type GroundItem } from '../src/game/game';
 import { LEVELS } from '../src/game/levelList';
-import { ANIMALS, ITEMS, UPGRADES, WORKSHOPS, WORKSHOP_LEVELS, type AnimalId, type ItemId, type UpgradeId, type Upgrades } from '../src/game/data';
+import { ANIMALS, ITEMS, PETS, UPGRADES, WORKSHOPS, WORKSHOP_LEVELS, type AnimalId, type ItemId, type UpgradeId, type Upgrades } from '../src/game/data';
 import { FIELD } from '../src/game/layout';
 
 const args = process.argv.slice(2);
 let range = [1, LEVELS.length];
-let runs = 5, apm = 130, starsArg = 'auto', verbose = false, json = false;
+let runs = 5, apm = 130, starsArg = 'auto', verbose = false, json = false, pets = true;
 for (let i = 0; i < args.length; i++) {
   const a = args[i];
   if (a === '--runs') runs = +args[++i];
@@ -15,6 +15,7 @@ for (let i = 0; i < args.length; i++) {
   else if (a === '--stars') starsArg = args[++i];
   else if (a === '--verbose') verbose = true;
   else if (a === '--json') json = true;
+  else if (a === '--nopets') pets = false;
   else if (/^\d+(-\d+)?$/.test(a)) { const [x, y] = a.split('-').map(Number); range = [x, y ?? x]; }
 }
 
@@ -95,10 +96,15 @@ function runLevel(idx: number, up: Upgrades) {
 
     // collecting
     if (space > 0 && g.items.length) {
-      const it = [...g.items].filter((i) => i.z < 2 && ITEMS[i.item].size <= space).sort((a, b) => (a.life - a.age) - (b.life - b.age))[0] as GroundItem | undefined;
+      // value an item: goal chain items and pricey goods matter; surplus cheap raw goods can be left to rot
+      const worth = (i: GroundItem) => (need.has(i.item) ? 2 : 0) + (ITEMS[i.item].price >= 50 ? 1 : 0);
+      const it = [...g.items].filter((i) => i.z < 2 && ITEMS[i.item].size <= space)
+        .sort((a, b) => worth(b) - worth(a) || (a.life - a.age) - (b.life - b.age))[0] as GroundItem | undefined;
       if (it) {
         const left = it.life - it.age;
-        add(left < 6 ? 80 : 50 + Math.min(15, g.items.length), () => {
+        const w = worth(it);
+        const base = w >= 2 ? 50 : w === 1 ? 46 : 34;
+        add(left < 6 && w ? base + 28 : base + Math.min(15, g.items.length), () => {
           const near = g.items.filter((o) => o !== it && o.z < 2 && Math.hypot(o.x - it.x, o.y - it.y) < 9).slice(0, 2);
           for (const o of [it, ...near]) if (!g.collectItem(o, true)) break;
           return true;
@@ -114,15 +120,16 @@ function runLevel(idx: number, up: Upgrades) {
       const useful = need.has(out);
       const eatsNeeded = (Object.keys(WORKSHOPS[w.kind].inputs) as ItemId[]).some((k) => need.has(k) && g.count(k) < 3);
       if (!useful && eatsNeeded) continue;
-      add((useful ? 68 : 38) - w.queue * 10, () => g.activateWorkshop(w));
+      const direct = g.goals.some((x) => !x.done && x.goal.kind === 'collect' && x.goal.item === out);
+      add((direct ? 80 : useful ? 68 : 38) - w.queue * 10, () => g.activateWorkshop(w));
     }
-    const unbuilt = g.workshops.filter((w) => !w.built).sort((a, b) => WORKSHOPS[a.kind].cost - WORKSHOPS[b.kind].cost)[0];
-    if (unbuilt && g.money >= WORKSHOPS[unbuilt.kind].cost + 100) add(55, () => g.activateWorkshop(unbuilt));
+    const unbuilt = g.workshops.filter((w) => !w.built).sort((a, b) => +need.has(WORKSHOPS[b.kind].output) - +need.has(WORKSHOPS[a.kind].output) || WORKSHOPS[a.kind].cost - WORKSHOPS[b.kind].cost)[0];
+    if (unbuilt && g.money >= WORKSHOPS[unbuilt.kind].cost + 100) add(need.has(WORKSHOPS[unbuilt.kind].output) ? 72 : 45, () => g.activateWorkshop(unbuilt));
 
     // helicopter supplies
     if (g.heli.state === 'home' && lv.buy?.length) {
       const needBuy = lv.buy.filter((id) => g.count(id) < 2 && g.workshops.some((w) => w.built && WORKSHOPS[w.kind].inputs[id]));
-      if (needBuy.length) add(58, () => {
+      if (needBuy.length) add(needBuy.some((id) => g.count(id) === 0) ? 70 : 58, () => {
         const order: Partial<Record<ItemId, number>> = {};
         const per = Math.floor(g.heliCap / needBuy.length);
         let cost = 0;
@@ -136,15 +143,22 @@ function runLevel(idx: number, up: Upgrades) {
 
     // animals
     const defaults: Record<AnimalId, number> = { chicken: 8, sheep: 5, ostrich: 3, cow: 3 };
-    const reserveForBuild = unbuilt ? WORKSHOPS[unbuilt.kind].cost : 0;
+    // save up for goal animals still to buy before spending on extras
+    const savingFor = [...goalAnimals].filter(([k, n]) => g.livingAnimals(k) < n).reduce((m, [k]) => Math.max(m, ANIMALS[k].cost), 0);
+    const reserveForBuild = Math.max(unbuilt ? WORKSHOPS[unbuilt.kind].cost : 0, savingFor);
     for (const k of [...lv.animals].sort((a, b) => ANIMALS[b].cost - ANIMALS[a].cost)) {
       const goalN = goalAnimals.get(k) ?? 0;
       const goalOpen = goalN > 0 && !g.goals.find((x) => x.goal.kind === 'animals' && x.goal.animal === k)?.done;
       const target = Math.max(goalN, defaults[k]);
       if (g.livingAnimals(k) >= target) continue;
-      if (goalOpen && g.money >= ANIMALS[k].cost) add(66, () => g.buyAnimal(k));
+      const supplier = need.has(ANIMALS[k].product) && g.livingAnimals(k) < 2;
+      if ((goalOpen || supplier) && g.money >= ANIMALS[k].cost) add(supplier && g.livingAnimals(k) === 0 ? 82 : 66, () => g.buyAnimal(k));
       else if (g.money >= ANIMALS[k].cost + reserveForBuild && hungry.length === 0) add(40, () => g.buyAnimal(k));
     }
+
+    // pets: a cat once products pile up, a dog on predator-heavy farms
+    if (pets && lv.pets?.includes('cat') && !g.pets.some((p) => p.kind === 'cat') && g.items.length >= 4 && g.money >= PETS.cat.cost + reserveForBuild + 200) add(64, () => g.buyPet('cat'));
+    if (pets && lv.pets?.includes('dog') && !g.pets.some((p) => p.kind === 'dog') && (lv.predators?.length ?? 0) >= 3 && g.money >= PETS.dog.cost + reserveForBuild + 200) add(56, () => g.buyPet('dog'));
 
     // truck
     if (g.truck.state === 'home') {
@@ -179,12 +193,17 @@ function runLevel(idx: number, up: Upgrades) {
     return false;
   };
 
-  let t = 0;
+  let t = 0, fullT = 0, busyT = 0, acts = 0;
+  const goalAt: number[] = lv.goals.map(() => Infinity);
   while (!g.won && t < 1500) {
     g.update(dt);
     t += dt;
     cd -= dt;
-    if (cd <= 0 && act()) cd = actionGap * (0.8 + Math.random() * 0.4);
+    if (g.storeUsed >= g.storeCap - 1) fullT += dt;
+    if (cd <= 0) {
+      if (act()) { cd = actionGap * (0.8 + Math.random() * 0.4); acts++; busyT += cd; }
+    }
+    g.goals.forEach((x, i) => { if (x.done && !isFinite(goalAt[i])) goalAt[i] = t; });
     g.drain();
   }
   if (verbose) {
@@ -192,12 +211,15 @@ function runLevel(idx: number, up: Upgrades) {
     const an = lv.animals.map((k) => `${k}:${g.livingAnimals(k)}`).join(' ');
     console.log(`   L${lv.id} t=${Math.round(t)} won=${g.won} $${Math.round(g.money)} | ${gs} | ${an} | store ${g.storeUsed}/${g.storeCap} ${JSON.stringify(g.store)} | ws ${g.workshops.map((w) => w.kind + (w.built ? 'B' : '-') + w.level).join(',')}`);
   }
-  return { won: g.won, time: g.won ? g.wonAt : Infinity, lost: g.stats.lostAnimals, expired: g.stats.expired, caught: g.stats.caught, money: g.money };
+  return {
+    won: g.won, time: g.won ? g.wonAt : Infinity, lost: g.stats.lostAnimals, expired: g.stats.expired, caught: g.stats.caught, money: g.money,
+    produced: g.stats.produced, full: fullT / t, busy: Math.min(1, busyT / t), goalAt,
+  };
 }
 
 const medians: Record<number, number> = {};
 console.log(`apm=${apm} runs=${runs}`);
-console.log('lvl  up(W/T/w/c/h)   median  min   max   | gold silver | lost exp  | verdict');
+console.log('lvl  up(W/T/w/c/h)   median  min   max   | gold silver | lost exp/prod full busy | goal times | verdict');
 for (let L = range[0]; L <= range[1]; L++) {
   const idx = L - 1;
   const stars = starsArg === 'auto' ? Math.round(idx * 2.2) : +starsArg;
@@ -208,7 +230,7 @@ for (let L = range[0]; L <= range[1]; L++) {
   const lv = LEVELS[idx];
   const f = (x: number) => (isFinite(x) ? String(Math.round(x)).padStart(5) : '  DNF');
   const verdict = med.time <= lv.gold ? 'EASY(gold)' : med.time <= lv.silver ? 'ok(silver)' : isFinite(med.time) ? 'HARD' : 'FAIL';
-  console.log(`${String(L).padStart(3)}  ${up.warehouse}/${up.truck}/${up.well}/${up.cage}/${up.heli}         ${f(med.time)} ${f(res[0].time)} ${f(res[runs - 1].time)} | ${String(lv.gold).padStart(4)} ${String(lv.silver).padStart(5)} | ${String(med.lost).padStart(4)} ${String(med.expired).padStart(3)}  | ${verdict}${verbose ? ' ' + JSON.stringify(med) : ''}`);
+  console.log(`${String(L).padStart(3)}  ${up.warehouse}/${up.truck}/${up.well}/${up.cage}/${up.heli}         ${f(med.time)} ${f(res[0].time)} ${f(res[runs - 1].time)} | ${String(lv.gold).padStart(4)} ${String(lv.silver).padStart(5)} | ${String(med.lost).padStart(4)} ${String(med.expired).padStart(3)}/${String(med.produced).padEnd(4)} ${String(Math.round(med.full * 100)).padStart(3)}% ${String(Math.round(med.busy * 100)).padStart(3)}% | ${med.goalAt.map((x) => (isFinite(x) ? Math.round(x) : '-')).join('/')} | ${verdict}${verbose ? ' ' + JSON.stringify(med) : ''}`);
 }
 
 if (json) console.log('JSON' + JSON.stringify(medians));
