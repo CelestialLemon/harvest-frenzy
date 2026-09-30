@@ -197,8 +197,9 @@ export class WorldRenderer {
       const k = Math.sin(this.warehouseBump * Math.PI) * 0.03;
       c.save();
       c.translate(WAREHOUSE.x + s.w / 2, WAREHOUSE.y + s.h);
-      c.scale(1 + k, 1 - k);
-      draw(c, 'warehouse', this.tier, 0, 0 - s.h + s.oy - 0);
+      c.scale(1 + k, 1 + k * 0.5); // grow only, so the static copy in bg never peeks out
+      // origin is the sprite's bottom-centre; place its top-left at (-w/2, -h)
+      draw(c, 'warehouse', this.tier, -s.w / 2 + s.ox, -s.h + s.oy);
       c.restore();
     }
     if (hover.kind === 'warehouse' || (hover.kind === 'truck')) {
