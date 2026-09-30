@@ -3,3 +3,5 @@ dist
 tools/out
 *.log
 .DS_Store
+.claude/
+.env*

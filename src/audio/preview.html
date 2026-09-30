@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Audio Preview</title>
+<style>
+  body { font: 14px system-ui, sans-serif; background: #2b2233; color: #f5e9d8; margin: 16px; }
+  h2 { font-size: 15px; margin: 18px 0 8px; color: #fbb954; }
+  button { margin: 3px; padding: 6px 10px; border: 0; border-radius: 4px; background: #4b3a5a; color: inherit; cursor: pointer; }
+  button:hover { background: #6a5480; }
+  button.on { background: #1ebc73; color: #102; }
+  label { margin-right: 16px; }
+  #status { opacity: .75; margin-top: 8px; }
+</style>
+</head>
+<body>
+  <h1>Harvest Frenzy — audio preview</h1>
+  <label>Music <input id="mv" type="range" min="0" max="1" step="0.05" value="0.5" /></label>
+  <label>SFX <input id="sv" type="range" min="0" max="1" step="0.05" value="0.8" /></label>
+  <h2>Music</h2><div id="music"></div>
+  <h2>SFX</h2><div id="sfx"></div>
+  <div id="status">Click anything to unlock audio.</div>
+  <script type="module" src="./preview.ts"></script>
+</body>
+</html>
