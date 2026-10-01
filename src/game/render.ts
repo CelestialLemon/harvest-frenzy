@@ -633,7 +633,8 @@ export class WorldRenderer {
       }
       const s = sprite(w.kind);
       const working = w.queue > 0;
-      const frame = working ? 1 + (Math.floor(t * 6) % Math.max(1, s.frames.length - 1)) : 0;
+      const fps = w.kind === 'bakery' ? s.fps : 6;
+      const frame = working ? 1 + (Math.floor(t * fps) % Math.max(1, s.frames.length - 1)) : 0;
       // working buildings "breathe"; finishing a product (or construction) gives a springy pop
       let sx = 1, sy = 1;
       if (working) { const k = Math.sin(t * 9 + r.y) * 0.022; sx -= k * 0.6; sy += k; }

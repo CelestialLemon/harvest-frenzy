@@ -154,7 +154,8 @@ Unless stated: anchor = bottom-center. "fN" = N frames. All characters face righ
 | helicopter | 56×36 | f3 | small cargo helicopter facing LEFT, rotor animation |
 | helipad | 56×24 | f1 | wooden/stone pad with H |
 | build_site | 72×64 | f1 | empty dirt plot with stakes/rope and a small "for sale" sign board (engine writes the price) |
-| powder_plant, bakery, cake_shop, spinnery, loom, tailor, pillow_factory, hat_shop, creamery, cheese_factory, ice_cream_factory | 72×64 each | f3 | f0 idle, f1-f2 working (smoke, spinning wheel, moving parts). Each must be visually distinct & communicate its product (sign with product icon). Base footprint touches bottom rows |
+| powder_plant, cake_shop, spinnery, loom, tailor, pillow_factory, hat_shop, creamery, cheese_factory, ice_cream_factory | 72×64 each | f3 | f0 idle, f1-f2 working (smoke, spinning wheel, moving parts). Each must be visually distinct & communicate its product (sign with product icon). Base footprint touches bottom rows |
+| bakery | 72×64 | f13 | f0 idle; f1-f12 form a forward working loop at 12 FPS: rising steam, moving conveyor cookies, rotating drive wheel. Base footprint touches bottom rows |
 | cage | 36×32 | f2 | iron cage bars (front overlay, transparent interior); f1 = dented/breaking |
 | ground_meadow / ground_savanna / ground_arctic | 16×16 | f4 | background ground tiles (variants), must tile seamlessly |
 | field_meadow / field_savanna / field_arctic | 16×16 | f4 | field soil tiles inside the pen (tilled earth / dry earth / frozen earth) |
